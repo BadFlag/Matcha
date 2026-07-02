@@ -1,16 +1,6 @@
 {
     "name": "Light",
-    "colorSeeds": {
-        "colorPrimaryBase": "#0066FF",
-        "colorPrimaryNavBase": "#0059B3",
-        "colorSuccessBase": "#32CE99",
-        "colorWarningBase": "#ED7B2F",
-        "colorErrorBase": "#CC1423",
-        "colorTextBase": "#000000",
-        "colorBgBase": "#FFFFFF"
-    },
     "colors": {
-        "colorPrimaryBase": "#0066FF",
         "colorPrimaryBg": "#F0F7FF",
         "colorPrimaryBgActive": "#D6E8FF",
         "colorPrimaryDisabled": "#BDDAFF",
@@ -18,15 +8,12 @@
         "colorPrimaryBgHover": "#2986FF",
         "colorPrimary": "#0066FF",
         "colorPrimaryActive": "#004FD9",
-        "colorPrimaryGradient": "#00000000",
-        "colorPrimaryNavBase": "#0059B3",
+        "colorPrimaryGradient": "#0F0077FF|#2B0066FF",
         "colorPrimaryNav": "#0059B3",
         "colorPrimaryNavRev": "#CCFFFFFF",
         "colorPrimaryNavSecondaryRev": "#A6FFFFFF",
         "colorPrimaryNavTertiaryRev": "#66FFFFFF",
         "colorPrimaryNavQuaternaryRev": "#40FFFFFF",
-
-        "colorSuccessBase": "#32CE99",
         "colorSuccessBg": "#F0FFF7",
         "colorSuccessBgActive": "#E0FFF1",
         "colorSuccessDisabled": "#B0F5D7",
@@ -34,8 +21,7 @@
         "colorSuccessHover": "#58DBAB",
         "colorSuccess": "#32CE99",
         "colorSuccessActive": "#20A87F",
-        "colorSuccessGradient": "#00000000",
-        "colorWarningBase": "#ED7B2F",
+        "colorSuccessGradient": "#0F32CE99|#2B32CE99",
         "colorWarningBg": "#FFF8F0",
         "colorWarningBgActive": "#FFECD6",
         "colorWarningDisabled": "#FFD6AD",
@@ -43,8 +29,7 @@
         "colorWarningHover": "#FA9F5A",
         "colorWarning": "#ED7B2F",
         "colorWarningActive": "#CE5C1E",
-        "colorWarningGradient": "#00000000",
-        "colorErrorBase": "#CC1423",
+        "colorWarningGradient": "#0FED7B2F|#2BED7B2F",
         "colorErrorBg": "#FFF1F0",
         "colorErrorBgActive": "#FFE0E0",
         "colorErrorDisabled": "#FFC8C7",
@@ -52,9 +37,7 @@
         "colorErrorHover": "#D93840",
         "colorError": "#CC1423",
         "colorErrorActive": "#A6081B",
-        "colorErrorGradient": "#00000000",
-
-        "colorTextBase": "#000000",
+        "colorErrorGradient": "#0FCC1423|#2BCC1423",
         "colorText": "#E0000000",
         "colorTextSecondary": "#A6000000",
         "colorTextTertiary": "#66000000",
@@ -63,8 +46,11 @@
         "colorTextSecondaryRev": "#A6FFFFFF",
         "colorTextTertiaryRev": "#66FFFFFF",
         "colorTextQuaternaryRev": "#40FFFFFF",
-
-        "colorBgBase": "#FFFFFF",
+        "colorBgContainer": "#FFFFFFFF",
+        "colorBgContainerSecondary": "#FAFAFC",
+        "colorBgContainerTertiary": "#F4F4F6",
+        "colorBgContainerQuaternary": "#EEEEF0",
+        "colorBgContainerQuinary": "#58585A",
         "colorFill": "#FFFFFFFF",
         "colorFillSecondary": "#FAFAFC",
         "colorFillTertiary": "#EEEEF0",
@@ -73,11 +59,6 @@
         "colorFillSecondaryHover": "#1A000000",
         "colorFillTertiaryHover": "#33000000",
         "colorFillQuaternaryHover": "#66000000",
-        "colorBgContainer": "#FFFFFFFF",
-        "colorBgContainerSecondary": "#FAFAFC",
-        "colorBgContainerTertiary": "#F4F4F6",
-        "colorBgContainerQuaternary": "#EEEEF0",
-        "colorBgContainerQuinary": "#58585A",
         "colorBgRender": "#FFFFFFFF",
         "colorBgRenderSecondary": "#A6FFFFFF",
         "colorBgRenderTertiary": "#66FFFFFF",
@@ -86,25 +67,138 @@
         "colorBorderSecondary": "#BEBEC0",
         "colorDivider": "#E3E3E6",
         "colorDividerSecondary": "#D8D8DA",
-        "colorDividerTertiary": "#8C8C8E",
-
-        "OnAccent": "#FFFFFFFF",
-        "OnAccentSecondary": "#D6E8FF",
-        "Focus": "#0066FF",
-        "Selection": "#D6E8FF",
-        "Link": "#0066FF",
-        "Scrim": "#4D000000",
-        "Overlay": "#E6FFFFFF",
-        "Shadow": "#1A000000",
-        "Separator": "#D8D8DA"
+        "colorDividerTertiary": "#8C8C8E"
     },
     "fonts": {
-        "fontWeightRegular": 400,
-        "fontWeightMedium": 500,
-        "fontWeightBold": 700,
-        "fontItalic": false,
-        "fontLineHeight": 1.4,
-        "fontLetterSpacing": 0,
-        "fontSizeBase": 12
+        "fontXS": {
+            "size": 10
+        },
+        "fontSM": {
+            "size": 12
+        },
+        "fontMS": {
+            "size": 14
+        },
+        "fontMD": {
+            "size": 16
+        },
+        "fontLG": {
+            "size": 16
+        }
+    },
+    "space": {
+        "spaceXXXS": 2,
+        "spaceXXS": 4,
+        "spaceXS": 8,
+        "spaceSM": 12,
+        "spaceMS": 16,
+        "spaceMD": 20,
+        "spaceLG": 24,
+        "spaceXL": 28,
+        "spaceXXL": 32,
+        "spaceXXXL": 64
+    },
+    "radius": {
+        "radiusSmall": 1,
+        "radiusDefault": 3,
+        "radiusLarge": 6,
+        "radiusRound": 255
+    },
+    "lineWidth": {
+        "lineWidthMS": 1,
+        "lineWidthMD": 2,
+        "lineWidthLG": 3,
+        "lineWidthXL": 4
+    },
+    "iconSize": {
+        "iconSizeXXS": 8,
+        "iconSizeXS": 12,
+        "iconSizeSM": 16,
+        "iconSizeMS": 20,
+        "iconSizeMD": 24,
+        "iconSizeLG": 32,
+        "iconSizeXL": 40,
+        "iconSizeXXL": 56,
+        "iconSizeXXXL": 64
+    },
+    "controlHeight": {
+        "controlHeightXS": 20,
+        "controlHeightSM": 24,
+        "controlHeightMS": 28,
+        "controlHeightMD": 32,
+        "controlHeightLG": 36,
+        "controlHeightXL": 40,
+        "controlHeightXXL": 44,
+        "controlHeightXXXL": 48
+    },
+    "containerWidth": {
+        "containerWidthXS": 20,
+        "containerWidthSM": 24,
+        "containerWidthMS": 28,
+        "containerWidthMD": 32,
+        "containerWidthLG": 36,
+        "containerWidthXL": 40
+    },
+    "shadows": {
+        "shadowSM": [
+            {
+                "orientation": [0, 1],
+                "blur": 2,
+                "spread": -2,
+                "color": [0, 10, 26, 40]
+            },
+            {
+                "orientation": [0, 3],
+                "blur": 6,
+                "spread": 0,
+                "color": [0, 10, 26, 30]
+            },
+            {
+                "orientation": [0, 5],
+                "blur": 12,
+                "spread": 4,
+                "color": [0, 10, 26, 22]
+            }
+        ],
+        "shadowMS": [
+            {
+                "orientation": [0, 3],
+                "blur": 6,
+                "spread": -4,
+                "color": [0, 10, 26, 30]
+            },
+            {
+                "orientation": [0, 6],
+                "blur": 16,
+                "spread": 0,
+                "color": [0, 10, 26, 20]
+            },
+            {
+                "orientation": [0, 5],
+                "blur": 28,
+                "spread": 8,
+                "color": [0, 10, 26, 12]
+            }
+        ],
+        "shadowMD": [
+            {
+                "orientation": [0, 6],
+                "blur": 16,
+                "spread": -8,
+                "color": [0, 10, 26, 20]
+            },
+            {
+                "orientation": [0, 9],
+                "blur": 28,
+                "spread": 0,
+                "color": [0, 10, 26, 12]
+            },
+            {
+                "orientation": [0, 12],
+                "blur": 48,
+                "spread": 16,
+                "color": [0, 10, 26, 8]
+            }
+        ]
     }
 }

@@ -132,26 +132,32 @@ TEST_CASE("kThemeHighContrast falls back to magenta palette") {
     CHECK(theme.Color(ColorToken::Surface) == QColor(255, 0, 255));
 }
 
-TEST_CASE("RegisterTheme rejects empty name") {
+TEST_CASE("RegisterTheme reads name from json") {
     matcha::test::QtAppGuard::Ensure();
     NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
 
-    CHECK_FALSE(theme.RegisterTheme(QString(), QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/HighContrast.json"), ThemeMode::Light));
+    CHECK(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/HighContrast.json")));
 }
 
 TEST_CASE("RegisterTheme rejects nonexistent file") {
     matcha::test::QtAppGuard::Ensure();
     NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
 
-    CHECK_FALSE(theme.RegisterTheme(QStringLiteral("Custom0"), QStringLiteral("/nonexistent/path.json"), ThemeMode::Light));
+    CHECK_FALSE(theme.RegisterTheme(QStringLiteral("/nonexistent/path.json")));
+}
+
+TEST_CASE("RegisterTheme rejects theme json without name") {
+    matcha::test::QtAppGuard::Ensure();
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+
+    CHECK_FALSE(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/MissingNameTheme.json")));
 }
 
 TEST_CASE("RegisterTheme + SetTheme loads registered palette") {
     matcha::test::QtAppGuard::Ensure();
     NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
 
-    CHECK(theme.RegisterTheme(kThemeHighContrast,
-        QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/HighContrast.json"), ThemeMode::Light));
+    CHECK(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/HighContrast.json")));
 
     theme.SetTheme(kThemeHighContrast);
     // HighContrast.json sets BgBase = #FFFFFF
@@ -165,8 +171,7 @@ TEST_CASE("Extends: custom theme inherits from base and overlays") {
     NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
 
     // Register a theme that extends Dark and overrides only BgBase and TextPrimary
-    CHECK(theme.RegisterTheme(QStringLiteral("Custom0"),
-        QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/CustomExtends.json"), ThemeMode::Dark));
+    CHECK(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/CustomExtends.json")));
 
     // Load Dark first to know its values
     theme.SetTheme(kThemeDark);
@@ -174,7 +179,7 @@ TEST_CASE("Extends: custom theme inherits from base and overlays") {
     const QColor darkBorderSubtle = theme.Color(ColorToken::BorderSubtle);
 
     // Switch to custom theme
-    theme.SetTheme(QString("Custom0"));
+    theme.SetTheme(QString("CustomExtends"));
 
     // Overridden: BgBase = #FF0000
     CHECK(theme.Color(ColorToken::Surface) == QColor(255, 0, 0));

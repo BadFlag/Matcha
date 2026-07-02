@@ -33,9 +33,11 @@
 #include <QObject>
 #include <QPixmap>
 #include <QString>
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string_view>
+#include <vector>
 
 namespace matcha::gui {
 
@@ -52,16 +54,34 @@ namespace matcha::gui {
   inline const QString kThemeHighContrast = QStringLiteral("HighContrast");
 
   /**
-   * @brief 主题的系统级亮色/暗色分类。
+   * @brief Runtime token categories used by the new string-key query API.
    *
-   * 每个主题属于 Light 或 Dark 家族。这用于控制：
-   * - `colorSeeds` 色调调色板的生成方向
-   * - `DynamicColor` 浅色/深色分支的选择
-   * - 操作系统深色模式集成（系统主题自动切换）
+   * New theme consumers should query tokens by their JSON key and a TokenKind.
+   * Legacy enum APIs remain available only as a temporary migration layer.
    */
-  enum class ThemeMode : uint8_t {
-    Light = 0,
-    Dark = 1,
+  enum class TokenKind : uint8_t {
+    Color,
+    Gradient,
+    Font,
+    Dimension,
+    Shadow,
+  };
+
+  struct GradientStop {
+    double position = 0.0;
+    QColor color;
+  };
+
+  struct GradientSpec {
+    std::vector<GradientStop> stops;
+  };
+
+  struct ShadowLayerSpec {
+    int offsetX = 0;
+    int offsetY = 0;
+    int blurRadius = 0;
+    int spread = 0;
+    QColor color;
   };
 
   // ============================================================================
@@ -114,33 +134,96 @@ namespace matcha::gui {
     [[nodiscard]] virtual auto CurrentTheme() const -> const QString& = 0;
 
     /**
-     * @brief 查询当前活动主题的 ThemeMode（Light/Dark）。
-     * @return 活动主题的 ThemeMode。
-     */
-    [[nodiscard]] virtual auto CurrentMode() const -> ThemeMode = 0;
-
-    /**
      * @brief 注册一个自 JSON 调色板文件支持的自定义主题。
      *
-     * JSON 文件可能包含`"extends"`键，命名任何已注册的主题。
-     * 当调用`SetTheme(name)`时，首先加载基础主题，然后将自定义 JSON 的值叠加到基础主题上。
+     * 主题名称来自 JSON 根字段 `name`。阶段一和阶段二不保留 `extends`
+     * 继承机制，也不再传入 ThemeMode。`name` 缺失或为空时注册失败。
      *
-     * 没有对自定义主题数量的限制。
-     *
-     * @param name     唯一的主题名称（例如 "OceanBlue"）。不能为空。
-     * @param jsonPath JSON 调色板文件的绝对路径。
-     * @param mode     主题的 Light 或 Dark 家族分类。
+     * @param jsonPath JSON 主题文件的绝对路径。
      * @return 注册成功返回 true，jsonPath 不存在时返回 false。
      */
-    virtual auto RegisterTheme(const QString& name, const QString& jsonPath, ThemeMode mode) -> bool = 0;
+    virtual auto RegisterTheme(const QString& jsonPath) -> bool = 0;
 
     // ========================================================================
-    // Qt-Dependent Token Queries (Color, Font, Shadow, Easing)
+    // String-Key Token Queries (new API, Stage 2)
+    // ========================================================================
+
+    /**
+     * @brief 按新版主题 JSON key 查询单色 Token。
+     *
+     * 新控件、插件和主题测试应优先使用此接口。该接口只查询单色，
+     * 不处理渐变 Token。
+     *
+     * 默认实现返回 std::nullopt，具体实现将在 S2-T2 补齐。
+     */
+    [[nodiscard]] virtual auto Color(std::string_view key) const -> std::optional<QColor> {
+      (void)key;
+      return std::nullopt;
+    }
+
+    /**
+     * @brief 按新版主题 JSON key 查询渐变 Token。
+     *
+     * 默认实现返回 std::nullopt，具体实现将在 S2-T5 补齐。
+     */
+    [[nodiscard]] virtual auto Gradient(std::string_view key) const -> std::optional<GradientSpec> {
+      (void)key;
+      return std::nullopt;
+    }
+
+    /**
+     * @brief 按新版主题 JSON key 查询尺寸类 Token 的基础像素值。
+     *
+     * 覆盖 `space/radius/lineWidth/iconSize/controlHeight/containerWidth`。
+     * 默认实现返回 std::nullopt，具体实现将在 S2-T3 补齐。
+     */
+    [[nodiscard]] virtual auto DimensionPx(std::string_view key) const -> std::optional<int> {
+      (void)key;
+      return std::nullopt;
+    }
+
+    /**
+     * @brief 按新版主题 JSON key 查询字体 Token。
+     *
+     * 默认实现返回 std::nullopt，具体实现将在 S2-T4 补齐。
+     */
+    [[nodiscard]] virtual auto Font(std::string_view key) const -> std::optional<FontSpec> {
+      (void)key;
+      return std::nullopt;
+    }
+
+    /**
+     * @brief 按新版主题 JSON key 查询多层阴影 Token。
+     *
+     * 默认实现返回 std::nullopt，具体实现将在 S2-T6 补齐。
+     */
+    [[nodiscard]] virtual auto Shadow(std::string_view key) const -> std::optional<std::span<const ShadowLayerSpec>> {
+      (void)key;
+      return std::nullopt;
+    }
+
+    /**
+     * @brief 检查指定类别和 key 的 Token 是否存在。
+     *
+     * 默认实现返回 false，具体实现将在 S2-T7 补齐。
+     */
+    [[nodiscard]] virtual auto HasToken(TokenKind kind, std::string_view key) const -> bool {
+      (void)kind;
+      (void)key;
+      return false;
+    }
+
+    // ========================================================================
+    // Legacy Enum Token Queries (temporary compatibility layer)
     // SpacingPx, Radius, AnimationMs are inherited from ITokenRegistry.
     // ========================================================================
 
     /**
      * @brief 将语义颜色 Token 解析为具体的 QColor。
+     *
+     * @deprecated 迁移期兼容接口。新代码应使用 `Color(std::string_view key)`。
+     *             主题模块整改完成后删除旧枚举消费 API。
+     *
      * @param token 语义颜色槽位。
      * @return 当前主题下解析出的颜色。
      */
@@ -149,7 +232,7 @@ namespace matcha::gui {
     /**
      * @brief 带交互状态叠加的颜色 Token 解析。
      *
-     * @deprecated 该重载目前仅委托给 `Color(token)`，没有应用任何状态相关的亮度/Alpha 偏移。
+     * @deprecated 迁移期兼容接口。该重载目前仅委托给 `Color(token)`，没有应用任何状态相关的亮度/Alpha 偏移。
      *             要获得正确的每状态颜色，请使用 `Resolve(kind, variantIndex, state)`，
      *             它会从 WidgetStyleSheet 的变体/状态颜色矩阵中读取。
      *
@@ -163,6 +246,10 @@ namespace matcha::gui {
 
     /**
      * @brief 按角色查询字体规范。
+     *
+     * @deprecated 迁移期兼容接口。新代码应使用 `Font(std::string_view key)`。
+     *             主题模块整改完成后删除旧枚举消费 API。
+     *
      * @param role 语义字体角色。
      * @return 平台相关的 FontSpec（家族、大小、字重等）。
      */
@@ -195,6 +282,10 @@ namespace matcha::gui {
 
     /**
      * @brief 按高度级别查询盒阴影参数。
+     *
+     * @deprecated 迁移期兼容接口。新代码应使用 `Shadow(std::string_view key)`。
+     *             主题模块整改完成后删除旧枚举消费 API。
+     *
      * @param token 高度 Token。
      * @return 阴影规范（偏移、模糊、不透明度）。
      */

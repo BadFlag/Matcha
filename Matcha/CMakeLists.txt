@@ -39,6 +39,50 @@ endif()
 # --------------------------------------------------------------------------- #
 # Matcha shared library
 # --------------------------------------------------------------------------- #
+add_library(MatchaTheming OBJECT
+    Source/Theming/ThemeServiceGlobal.cpp
+    Source/Theming/NyanTheme.cpp
+    Source/Theming/SvgIconProvider.cpp
+    Source/Theming/SvgIconProvider.h
+    Source/Theming/Palette/TonalPaletteGenerator.cpp
+    Source/Theming/Palette/ContrastChecker.cpp
+    Source/Theming/Token/DtcgTokenModel.cpp
+    Source/Theming/Token/DtfmTokenModel.cpp
+    Source/Theming/Token/TokenRegistryGlobal.cpp
+    Source/Theming/Token/VariantNameRegistry.cpp
+    Include/Matcha/Theming/IThemeService.h
+    Include/Matcha/Theming/NyanTheme.h
+    Include/Matcha/Theming/DesignTokens.h
+    Include/Matcha/Theming/ResolvedStyle.h
+    Include/Matcha/Theming/WidgetStyleSheet.h
+    Include/Matcha/Theming/Palette/ContrastChecker.h
+    Include/Matcha/Theming/Palette/DefaultPalette.h
+    Include/Matcha/Theming/Palette/TonalPaletteGenerator.h
+    Include/Matcha/Theming/Token/DtcgTokenModel.h
+    Include/Matcha/Theming/Token/DtfmTokenModel.h
+    Include/Matcha/Theming/Token/ITokenRegistry.h
+    Include/Matcha/Theming/Token/TokenEnums.h
+    Include/Matcha/Theming/Token/TokenRegistryGlobal.h
+    Include/Matcha/Theming/Token/VariantNameRegistry.h
+)
+
+target_include_directories(MatchaTheming
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Include>
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_compile_definitions(MatchaTheming PRIVATE MATCHA_LIB_EXPORT)
+
+target_link_libraries(MatchaTheming
+    PUBLIC
+        Qt6::Widgets
+    PRIVATE
+        Qt6::Svg
+        Matcha_CompilerWarnings
+)
+
 add_library(Matcha SHARED
     Source/Core/Placeholder.cpp
     Source/Theming/ThemeAware.cpp
@@ -590,6 +634,43 @@ target_link_libraries(MatchaMockPlugin
 # --------------------------------------------------------------------------- #
 enable_testing()
 
+# -- MatchaThemeTests (theme module only, doctest + Qt) --------------------- #
+add_executable(MatchaThemeTests
+    Tests/Unit/main.cpp
+    Tests/Unit/Theming/ThemeTokenQueryTest.cpp
+)
+
+target_include_directories(MatchaThemeTests PRIVATE
+    Tests/TestUtils
+    Include
+    Source
+)
+
+target_compile_definitions(MatchaThemeTests PRIVATE
+    MATCHA_LIB_EXPORT
+    MATCHA_TEST_PALETTE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources/Themes"
+    MATCHA_TEST_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Tests/Fixtures"
+)
+
+target_link_libraries(MatchaThemeTests
+    PRIVATE
+        MatchaTheming
+        Qt6::Widgets
+        Qt6::Svg
+        Matcha_CompilerWarnings
+)
+
+file(TO_NATIVE_PATH "${CMAKE_PREFIX_PATH}/bin" _MATCHA_QT_BIN_NATIVE)
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}" _MATCHA_THEME_BUILD_DIR_NATIVE)
+file(GENERATE
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/RunMatchaThemeTests.cmd"
+    CONTENT "@echo off\r\nset \"PATH=${_MATCHA_QT_BIN_NATIVE};${_MATCHA_THEME_BUILD_DIR_NATIVE};%PATH%\"\r\nMatchaThemeTests.exe %*\r\n"
+)
+add_test(NAME MatchaThemeTests COMMAND "${CMAKE_CURRENT_BINARY_DIR}/RunMatchaThemeTests.cmd")
+set_tests_properties(MatchaThemeTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
 # -- MatchaUnitTests (doctest only, no Qt event loop) ---------------------- #
 add_executable(MatchaUnitTests
     Tests/Unit/main.cpp
@@ -798,7 +879,7 @@ endif()
 # POST_BUILD: copy Qt runtime DLLs to build output directory (Windows)
 # --------------------------------------------------------------------------- #
 if(WIN32)
-    set(_MATCHA_EXE_TARGETS NyanCad MatchaUnitTests MatchaWidgetTests MatchaIntegrationTests)
+    set(_MATCHA_EXE_TARGETS NyanCad MatchaThemeTests MatchaUnitTests MatchaWidgetTests MatchaIntegrationTests)
 
     foreach(_target IN LISTS _MATCHA_EXE_TARGETS)
         # Copy all runtime DLLs that CMake knows about (Qt6Core, Qt6Gui, etc.)

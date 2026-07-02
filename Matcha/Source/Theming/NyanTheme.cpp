@@ -28,11 +28,12 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <string>
 #include <utility>
 
 #include "Matcha/Theming/NyanTheme.h"
 #include "Matcha/Theming/Palette/ContrastChecker.h"
-#include "Matcha/Theming/Palette/TonalPaletteGenerator.h"
+#include "Matcha/Theming/Palette/DefaultPalette.h"
 #include "SvgIconProvider.h"
 
 namespace matcha::gui {
@@ -138,22 +139,173 @@ namespace matcha::gui {
     "Separator",
 };
 
-    // Index of first semantic hue token (colorPrimaryBg) in kColorTokenNames / ColorToken enum.
-    // 5 colorBgContainer + 4 colorFill + 3 Border + 4 Text = 16
-    constexpr std::size_t kSemanticHueOffset = 16;
+    [[nodiscard]] auto TokenKey(std::string_view key) -> std::string {
+      return {key.data(), key.size()};
+    }
 
-    // Number of steps per hue (Ant Design 10-step model)
-    constexpr std::size_t kStepsPerHue = 10;
-
-    // Hue names in order matching the enum layout (5 hues x 10 levels)
-    constexpr std::array<const char*, 5> kHueNames = {
-      "colorPrimary", "colorSuccess", "Warning", "colorError", "colorInfo",
+    struct PlatformFontFamilies {
+      QString sansFamily;
+      QString monoFamily;
     };
 
-    // FontRole JSON key table (must match FontRole enum order exactly)
-    constexpr std::array<const char*, kFontRoleCount> kFontRoleNames = {
-      "Body", "BodyMedium", "BodyBold", "Caption", "Heading", "Monospace", "ToolTip",
-    };
+    [[nodiscard]] auto DetectPlatformFontFamilies() -> PlatformFontFamilies {
+      PlatformFontFamilies families;
+
+#if defined(Q_OS_WIN)
+      families.sansFamily = QStringLiteral("Segoe UI");
+      families.monoFamily = QStringLiteral("Cascadia Code");
+#elif defined(Q_OS_MACOS)
+      families.sansFamily = QStringLiteral("SF Pro Text");
+      families.monoFamily = QStringLiteral("SF Mono");
+#else
+      families.sansFamily = QStringLiteral("Noto Sans");
+      families.monoFamily = QStringLiteral("Noto Sans Mono");
+#endif
+
+      const auto availableFamilies = QFontDatabase::families();
+      if (!availableFamilies.contains(families.sansFamily)) {
+        families.sansFamily = QFontDatabase::systemFont(QFontDatabase::GeneralFont).family();
+      }
+      if (!availableFamilies.contains(families.monoFamily)) {
+        families.monoFamily = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
+      }
+
+      return families;
+    }
+
+    [[nodiscard]] auto DefaultFontSpec(QString family, int sizeInPt) -> FontSpec {
+      return FontSpec{
+          .family = std::move(family),
+          .sizeInPt = sizeInPt,
+          .weight = 400,
+          .italic = false,
+          .lineHeightMultiplier = 1.4,
+          .letterSpacing = 0.0,
+      };
+    }
+
+    [[nodiscard]] auto ScaledFontSpec(FontSpec spec, float scale) -> FontSpec {
+      const int scaled = static_cast<int>(std::lroundf(static_cast<float>(spec.sizeInPt) * scale));
+      spec.sizeInPt = std::max(scaled, 6);
+      return spec;
+    }
+
+    [[nodiscard]] auto LegacyColorTokenKey(ColorToken token) -> std::optional<std::string_view> {
+      const auto idx = std::to_underlying(token);
+      if (idx >= kColorTokenNames.size()) {
+        return std::nullopt;
+      }
+      return std::string_view{kColorTokenNames[idx]};
+    }
+
+    [[nodiscard]] auto LegacySpaceTokenKey(fw::SpaceToken token) -> std::optional<std::string_view> {
+      switch (std::to_underlying(token)) {
+        case 2:
+          return "spaceXXXS";
+        case 4:
+          return "spaceXXS";
+        case 8:
+          return "spaceXS";
+        case 12:
+          return "spaceSM";
+        case 16:
+          return "spaceMS";
+        case 20:
+          return "spaceMD";
+        case 24:
+          return "spaceLG";
+        case 28:
+          return "spaceXL";
+        case 32:
+          return "spaceXXL";
+        default:
+          return std::nullopt;
+      }
+    }
+
+    [[nodiscard]] auto LegacyRadiusTokenKey(fw::RadiusToken token) -> std::optional<std::string_view> {
+      switch (std::to_underlying(token)) {
+        case 1:
+          return "radiusSmall";
+        case 3:
+          return "radiusDefault";
+        case 6:
+          return "radiusLarge";
+        case 255:
+          return "radiusRound";
+        default:
+          return std::nullopt;
+      }
+    }
+
+    [[nodiscard]] auto LegacyFontRoleKey(FontRole role) -> std::optional<std::string_view> {
+      switch (role) {
+        case FontRole::fontWeightRegular:
+        case FontRole::fontItalic:
+        case FontRole::fontLetterSpacing:
+        case FontRole::fontSizeBase:
+          return "fontSM";
+        case FontRole::fontWeightMedium:
+          return "fontMS";
+        case FontRole::fontWeightBold:
+        case FontRole::fontLineHeight:
+          return "fontLG";
+        case FontRole::fontSizeXS:
+          return "fontXS";
+        case FontRole::fontSizeSM:
+          return "fontSM";
+        case FontRole::fontSizeMD:
+          return "fontMD";
+        case FontRole::fontSizeLG:
+        case FontRole::fontSizeXL:
+        case FontRole::fontSizeXXL:
+          return "fontLG";
+        default:
+          return std::nullopt;
+      }
+    }
+
+    [[nodiscard]] auto LegacyShadowTokenKey(ShadowToken token) -> std::optional<std::string_view> {
+      switch (token) {
+        case ShadowToken::boxShadow:
+          return "shadowSM";
+        case ShadowToken::boxShadowSecondary:
+          return "shadowMS";
+        case ShadowToken::boxShadowTertiary:
+          return "shadowMD";
+        default:
+          return std::nullopt;
+      }
+    }
+
+    [[nodiscard]] auto ParseGradientToken(QString value, std::string_view key) -> std::optional<GradientSpec> {
+      const auto stops = value.split(u'|', Qt::SkipEmptyParts);
+      if (stops.size() < 2) {
+        qWarning() << "Invalid gradient token:" << QString::fromUtf8(key.data(), static_cast<qsizetype>(key.size()))
+                   << value;
+        return std::nullopt;
+      }
+
+      GradientSpec spec;
+      spec.stops.reserve(static_cast<std::size_t>(stops.size()));
+
+      for (qsizetype i = 0; i < stops.size(); ++i) {
+        const QColor color = QColor::fromString(stops.at(i).trimmed());
+        if (!color.isValid()) {
+          qWarning() << "Invalid gradient color:"
+                     << QString::fromUtf8(key.data(), static_cast<qsizetype>(key.size())) << stops.at(i);
+          return std::nullopt;
+        }
+
+        const auto denominator = static_cast<double>(stops.size() - 1);
+        spec.stops.push_back(GradientStop{
+            .position = static_cast<double>(i) / denominator,
+            .color = color,
+        });
+      }
+
+      return spec;
+    }
 
   }  // anonymous namespace
 
@@ -173,20 +325,14 @@ namespace matcha::gui {
   void NyanTheme::SetTheme(const QString& name) {
     _currentTheme = name;
 
-    // Resolve mode: check registered themes, else default by name
     const auto regKey = name.toStdString();
     auto regIt = _themeRegistry.find(regKey);
-    if (regIt != _themeRegistry.end()) {
-      _currentMode = regIt->second.mode;
+    if (regIt == _themeRegistry.end()) {
+      // 没有找到直接退出，必须先注册主题，然后再设置主题才能生效。[TODO 缺少告警打印]
+      return;
     }
-    else if (name == kThemeDark) {
-      _currentMode = ThemeMode::Dark;
-    }
-    else {
-      _currentMode = ThemeMode::Light;
-    }
-
     LoadPalette(name);
+    /*
     BuildFonts();
     BuildShadows();
     BuildStyleSheets();
@@ -211,7 +357,7 @@ namespace matcha::gui {
     }
 #endif
 
-    BuildGlobalStyleSheet();
+    BuildGlobalStyleSheet();*/
 
     emit ThemeChanged(name);
   }
@@ -220,18 +366,27 @@ namespace matcha::gui {
     return _currentTheme;
   }
 
-  auto NyanTheme::CurrentMode() const -> ThemeMode {
-    return _currentMode;
-  }
-
-  auto NyanTheme::RegisterTheme(const QString& name, const QString& jsonPath, ThemeMode mode) -> bool {
-    if (name.isEmpty()) {
-      return false;
-    }
+  auto NyanTheme::RegisterTheme(const QString& jsonPath) -> bool {
     if (!QFile::exists(jsonPath)) {
       return false;
     }
-    _themeRegistry[name.toStdString()] = ThemeEntry{jsonPath, mode};
+
+    QFile file(jsonPath);
+    if (!file.open(QIODevice::ReadOnly)) {
+      return false;
+    }
+
+    const auto doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject()) {
+      return false;
+    }
+
+    const auto name = ReadThemeName(doc.object());
+    if (name.isEmpty()) {
+      return false;
+    }
+
+    _themeRegistry[name.toStdString()] = ThemeEntry{name, jsonPath};
     return true;
   }
 
@@ -239,7 +394,79 @@ namespace matcha::gui {
   // Palette Loading
   // ============================================================================
 
+  void NyanTheme::InitializeDefaultTokens() {
+    for (std::size_t i = 0; i < kColorTokenCount; ++i) {
+      _colors[i] = QColor::fromRgba(static_cast<QRgb>(defaults::kLightDefaultColors[i]));
+    }
+
+    _colorTokensByKey.clear();
+    _gradientTokensByKey.clear();
+    _fontTokensByKey.clear();
+    _dimensionTokensByKey.clear();
+    _shadowTokensByKey.clear();
+    _springS = fw::SpringSpec{};
+
+    const auto platformFonts = DetectPlatformFontFamilies();
+    _fontTokensByKey.emplace("fontXS", DefaultFontSpec(platformFonts.sansFamily, 10));
+    _fontTokensByKey.emplace("fontSM", DefaultFontSpec(platformFonts.sansFamily, 12));
+    _fontTokensByKey.emplace("fontMS", DefaultFontSpec(platformFonts.sansFamily, 14));
+    _fontTokensByKey.emplace("fontMD", DefaultFontSpec(platformFonts.sansFamily, 16));
+    _fontTokensByKey.emplace("fontLG", DefaultFontSpec(platformFonts.sansFamily, 16));
+
+    _dimensionTokensByKey.emplace("spaceXXXS", 2);
+    _dimensionTokensByKey.emplace("spaceXXS", 4);
+    _dimensionTokensByKey.emplace("spaceXS", 8);
+    _dimensionTokensByKey.emplace("spaceSM", 12);
+    _dimensionTokensByKey.emplace("spaceMS", 16);
+    _dimensionTokensByKey.emplace("spaceMD", 20);
+    _dimensionTokensByKey.emplace("spaceLG", 24);
+    _dimensionTokensByKey.emplace("spaceXL", 28);
+    _dimensionTokensByKey.emplace("spaceXXL", 32);
+    _dimensionTokensByKey.emplace("spaceXXXL", 64);
+
+    _dimensionTokensByKey.emplace("radiusSmall", 1);
+    _dimensionTokensByKey.emplace("radiusDefault", 3);
+    _dimensionTokensByKey.emplace("radiusLarge", 6);
+    _dimensionTokensByKey.emplace("radiusRound", 255);
+
+    _dimensionTokensByKey.emplace("lineWidthMS", 1);
+    _dimensionTokensByKey.emplace("lineWidthMD", 2);
+    _dimensionTokensByKey.emplace("lineWidthLG", 3);
+    _dimensionTokensByKey.emplace("lineWidthXL", 4);
+
+    _dimensionTokensByKey.emplace("iconSizeXXS", 8);
+    _dimensionTokensByKey.emplace("iconSizeXS", 12);
+    _dimensionTokensByKey.emplace("iconSizeSM", 16);
+    _dimensionTokensByKey.emplace("iconSizeMS", 20);
+    _dimensionTokensByKey.emplace("iconSizeMD", 24);
+    _dimensionTokensByKey.emplace("iconSizeLG", 32);
+    _dimensionTokensByKey.emplace("iconSizeXL", 40);
+    _dimensionTokensByKey.emplace("iconSizeXXL", 56);
+    _dimensionTokensByKey.emplace("iconSizeXXXL", 64);
+
+    _dimensionTokensByKey.emplace("controlHeightXS", 20);
+    _dimensionTokensByKey.emplace("controlHeightSM", 24);
+    _dimensionTokensByKey.emplace("controlHeightMS", 28);
+    _dimensionTokensByKey.emplace("controlHeightMD", 32);
+    _dimensionTokensByKey.emplace("controlHeightLG", 36);
+    _dimensionTokensByKey.emplace("controlHeightXL", 40);
+    _dimensionTokensByKey.emplace("controlHeightXXL", 44);
+    _dimensionTokensByKey.emplace("controlHeightXXXL", 48);
+
+    _dimensionTokensByKey.emplace("containerWidthXS", 20);
+    _dimensionTokensByKey.emplace("containerWidthSM", 24);
+    _dimensionTokensByKey.emplace("containerWidthMS", 28);
+    _dimensionTokensByKey.emplace("containerWidthMD", 32);
+    _dimensionTokensByKey.emplace("containerWidthLG", 36);
+    _dimensionTokensByKey.emplace("containerWidthXL", 40);
+
+    BuildFonts();
+    BuildShadows();
+  }
+
   void NyanTheme::LoadPalette(const QString& themeName) {
+    InitializeDefaultTokens();
+
     // Resolve the JSON file path for this theme
     QString filePath;
     const auto regKey = themeName.toStdString();
@@ -255,129 +482,247 @@ namespace matcha::gui {
         filePath = candidate;
       }
       else {
-        //未知主题——绿色备选
-        _colors.fill(QColor(0, 255, 0));
+        qWarning() << "Theme file not found:" << candidate;
         return;
       }
     }
 
+    /*
+      这里的修改方案：
+        1 亮色主题作为内置主题，后期将配置文件内容直接固化或者Token硬编码
+        2 打开文件如果不存在或者失败不应该切换当前已设置的主题
+    */
+
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
-      // 无法打开文件——蓝绿色备选
-      _colors.fill(QColor(0, 255, 255));
+      qWarning() << "Failed to open theme file:" << filePath << file.errorString();
       return;
     }
 
     const auto doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject()) {
+      qWarning() << "Theme JSON root is not an object:" << filePath;
+      return;
+    }
+
     const auto root = doc.object();
+    const auto name = ReadThemeName(root);
+    if (name.isEmpty() || name != themeName) {
+      qWarning() << "Theme name mismatch:" << filePath << "expected" << themeName << "actual" << name;
+      return;
+    }
 
-    // 步骤0：如果存在“扩展”，先加载基础主题（仅一关）
-    const auto extendsName = root.value(QStringLiteral("extends")).toString();
-    if (!extendsName.isEmpty()) {
-      if (extendsName != themeName) {
-        LoadPalette(extendsName);
-        // _colors 现在保留了基础主题;我们在下面叠加
+    ApplyColorTokens(root.value(QStringLiteral("colors")).toObject());
+    ApplyColorOverrides(root.value(QStringLiteral("colorOverrides")).toObject());
+    ApplySpringTokens(root.value(QStringLiteral("spring")).toObject());
+    ApplyFontTokens(root.value(QStringLiteral("fonts")).toObject());
+    BuildFonts();
+    ApplyMetricTokens(root);
+    ApplyShadowTokens(root.value(QStringLiteral("shadows")).toObject());
+    return;
+  }
+
+  auto NyanTheme::ReadThemeName(const QJsonObject& root) const -> QString {
+    const auto name = root.value(QStringLiteral("name")).toString().trimmed();
+    return name;
+  }
+
+  void NyanTheme::ApplyColorTokens(const QJsonObject& colors) {
+    if (colors.isEmpty()) {
+      return;
+    }
+
+    for (auto it = colors.constBegin(); it != colors.constEnd(); ++it) {
+      const auto key = it.key().toStdString();
+      const auto value = it.value().toString();
+      if (value.isEmpty()) {
+        continue;
+      }
+
+      if (it.key().endsWith(QStringLiteral("Gradient")) || value.contains(u'|')) {
+        _gradientTokensByKey[key] = value;
+        continue;
+      }
+
+      const QColor c = QColor::fromString(value);
+      if (c.isValid()) {
+        _colorTokensByKey[key] = c;
       }
     }
-    else if (regIt != _themeRegistry.end()) {
-      // 注册主题没有“extends”开始从头开始
-      _colors.fill(QColor(0, 0, 255));
+  }
+
+  void NyanTheme::ApplyColorOverrides(const QJsonObject& overrides) {
+    if (overrides.isEmpty()) {
+      return;
     }
 
-    // 步骤1：叠加显式颜色条目（非空值）
-    const auto colors = root.value(QStringLiteral("colors")).toObject();
-    if (!colors.isEmpty()) {
-      for (std::size_t i = 0; i < kColorTokenCount; ++i) {
-        const auto value = colors.value(QLatin1String(kColorTokenNames[i])).toString();
-        if (!value.isEmpty()) {
-          const QColor c = QColor::fromString(value);
-          if (c.isValid()) {
-            _colors[i] = c;
-          }
-        }
-        else if (extendsName.isEmpty()) {
-          // 没有基础主题且没有值——色备选
-          _colors[i] = QColor(255, 255, 0);
-        }
-        // else: 从基础主题继承（步骤0）
+    for (auto it = overrides.constBegin(); it != overrides.constEnd(); ++it) {
+      const auto key = it.key().toStdString();
+      const auto value = it.value().toString();
+      if (value.isEmpty()) {
+        continue;
+      }
+
+      const QColor c = QColor::fromString(value);
+      if (c.isValid()) {
+        _colorTokensByKey[key] = c;
       }
     }
+  }
 
-    // 步骤2：如果存在“种子”，自动生成36个语义色调颜色
-    const auto seeds = root.value(QStringLiteral("colorSeeds")).toObject();
-    if (!seeds.isEmpty()) {
-      for (std::size_t h = 0; h < kHueNames.size(); ++h) {
-        const auto seedStr = seeds.value(QLatin1String(kHueNames[h])).toString();
-        if (seedStr.isEmpty()) {
+  void NyanTheme::ApplySpringTokens(const QJsonObject& spring) {
+    if (spring.isEmpty()) {
+      return;
+    }
+
+    if (spring.contains(QStringLiteral("mass"))) {
+      _springS.mass = static_cast<float>(spring.value(QStringLiteral("mass")).toDouble(1.0));
+    }
+    if (spring.contains(QStringLiteral("stiffness"))) {
+      _springS.stiffness = static_cast<float>(spring.value(QStringLiteral("stiffness")).toDouble(200.0));
+    }
+    if (spring.contains(QStringLiteral("damping"))) {
+      _springS.damping = static_cast<float>(spring.value(QStringLiteral("damping")).toDouble(20.0));
+    }
+  }
+
+  void NyanTheme::ApplyFontTokens(const QJsonObject& fonts) {
+    if (fonts.isEmpty()) {
+      return;
+    }
+
+    const auto fallbackFamily = DetectPlatformFontFamilies().sansFamily;
+
+    for (auto it = fonts.constBegin(); it != fonts.constEnd(); ++it) {
+      const auto fontObj = it.value().toObject();
+      if (fontObj.isEmpty()) {
+        continue;
+      }
+
+      const auto tokenKey = it.key().toStdString();
+      auto spec = FontSpec{};
+      if (const auto existing = _fontTokensByKey.find(tokenKey); existing != _fontTokensByKey.end()) {
+        spec = existing->second;
+      }
+      else {
+        spec = DefaultFontSpec(fallbackFamily, FontSpec{}.sizeInPt);
+      }
+
+      if (fontObj.contains(QStringLiteral("family"))) {
+        const auto family = fontObj.value(QStringLiteral("family")).toString().trimmed();
+        if (!family.isEmpty()) {
+          spec.family = family;
+        }
+      }
+      if (fontObj.contains(QStringLiteral("size"))) {
+        const auto size = fontObj.value(QStringLiteral("size")).toInt(spec.sizeInPt);
+        if (size > 0) {
+          spec.sizeInPt = size;
+        }
+      }
+      if (fontObj.contains(QStringLiteral("weight"))) {
+        const auto weight = fontObj.value(QStringLiteral("weight")).toInt(spec.weight);
+        if (weight > 0) {
+          spec.weight = weight;
+        }
+      }
+      if (fontObj.contains(QStringLiteral("italic"))) {
+        spec.italic = fontObj.value(QStringLiteral("italic")).toBool(spec.italic);
+      }
+      if (fontObj.contains(QStringLiteral("lineHeightMultiplier"))) {
+        const auto lineHeight = fontObj.value(QStringLiteral("lineHeightMultiplier")).toDouble(spec.lineHeightMultiplier);
+        if (lineHeight > 0.0) {
+          spec.lineHeightMultiplier = lineHeight;
+        }
+      }
+      else if (fontObj.contains(QStringLiteral("lineHeight"))) {
+        const auto lineHeight = fontObj.value(QStringLiteral("lineHeight")).toDouble(spec.lineHeightMultiplier);
+        if (lineHeight > 0.0) {
+          spec.lineHeightMultiplier = lineHeight;
+        }
+      }
+      if (fontObj.contains(QStringLiteral("letterSpacing"))) {
+        spec.letterSpacing = fontObj.value(QStringLiteral("letterSpacing")).toDouble(spec.letterSpacing);
+      }
+      if (spec.family.isEmpty()) {
+        spec.family = fallbackFamily;
+      }
+
+      _fontTokensByKey[tokenKey] = spec;
+    }
+  }
+
+  void NyanTheme::ApplyMetricTokens(const QJsonObject& root) {
+    const std::array groups = {
+      QStringLiteral("space"),
+      QStringLiteral("radius"),
+      QStringLiteral("lineWidth"),
+      QStringLiteral("iconSize"),
+      QStringLiteral("controlHeight"),
+      QStringLiteral("containerWidth"),
+    };
+
+    for (const auto& groupName : groups) {
+      const auto group = root.value(groupName).toObject();
+      if (group.isEmpty()) {
+        continue;
+      }
+
+      for (auto it = group.constBegin(); it != group.constEnd(); ++it) {
+        if (!it.value().isDouble()) {
+          continue;
+        }
+        _dimensionTokensByKey[it.key().toStdString()] = it.value().toInt();
+      }
+    }
+  }
+
+  void NyanTheme::ApplyShadowTokens(const QJsonObject& shadows) {
+    if (shadows.isEmpty()) {
+      return;
+    }
+
+    for (auto it = shadows.constBegin(); it != shadows.constEnd(); ++it) {
+      const auto layersJson = it.value().toArray();
+      if (layersJson.isEmpty()) {
+        continue;
+      }
+
+      std::vector<ShadowLayerSpec> layers;
+      layers.reserve(static_cast<std::size_t>(layersJson.size()));
+
+      for (const auto& layerValue : layersJson) {
+        const auto layerObj = layerValue.toObject();
+        if (layerObj.isEmpty()) {
           continue;
         }
 
-        const QColor seedColor = QColor::fromString(seedStr);
-        if (!seedColor.isValid()) {
+        const auto orientation = layerObj.value(QStringLiteral("orientation")).toArray();
+        if (orientation.size() < 2 || !orientation.at(0).isDouble() || !orientation.at(1).isDouble()) {
           continue;
         }
 
-        const auto ramp = (_currentMode == ThemeMode::Light) ? TonalPaletteGenerator::GenerateLight(seedColor)
-                                                             : TonalPaletteGenerator::GenerateDark(seedColor);
+        ShadowLayerSpec layer;
+        layer.offsetX = orientation.at(0).toInt();
+        layer.offsetY = orientation.at(1).toInt();
+        layer.blurRadius = layerObj.value(QStringLiteral("blur")).toInt();
+        layer.spread = layerObj.value(QStringLiteral("spread")).toInt();
 
-        const std::size_t base = kSemanticHueOffset + (h * kStepsPerHue);
-        for (std::size_t t = 0; t < kStepsPerHue; ++t) {
-          _colors[base + t] = ramp[t];
+        const auto color = layerObj.value(QStringLiteral("color")).toArray();
+        if (color.size() >= 4) {
+          layer.color = QColor(
+              color.at(0).toInt(),
+              color.at(1).toInt(),
+              color.at(2).toInt(),
+              color.at(3).toInt()
+          );
         }
-      }
-    }
 
-    // Step 3: Apply colorOverrides (individual token corrections after generation)
-    const auto overrides = root.value(QStringLiteral("colorOverrides")).toObject();
-    if (!overrides.isEmpty()) {
-      for (std::size_t i = 0; i < kColorTokenCount; ++i) {
-        const auto ovStr = overrides.value(QLatin1String(kColorTokenNames[i])).toString();
-        if (!ovStr.isEmpty()) {
-          const QColor ovColor = QColor::fromString(ovStr);
-          if (ovColor.isValid()) {
-            _colors[i] = ovColor;
-          }
-        }
+        layers.push_back(layer);
       }
-    }
 
-    // Step 4: Read optional fontScale from palette JSON
-    if (root.contains(QStringLiteral("fontScale"))) {
-      const auto fs = static_cast<float>(root.value(QStringLiteral("fontScale")).toDouble(1.0));
-      _fontScale = std::clamp(fs, fw::kFontScaleMin, fw::kFontScaleMax);
-    }
-
-    // Step 5: Read optional spring dynamics parameters
-    // JSON format: "spring": { "mass": 1.0, "stiffness": 200, "damping": 20 }
-    const auto springObj = root.value(QStringLiteral("spring")).toObject();
-    if (!springObj.isEmpty()) {
-      if (springObj.contains(QStringLiteral("mass"))) {
-        _springS.mass = static_cast<float>(springObj.value(QStringLiteral("mass")).toDouble(1.0));
-      }
-      if (springObj.contains(QStringLiteral("stiffness"))) {
-        _springS.stiffness = static_cast<float>(springObj.value(QStringLiteral("stiffness")).toDouble(200.0));
-      }
-      if (springObj.contains(QStringLiteral("damping"))) {
-        _springS.damping = static_cast<float>(springObj.value(QStringLiteral("damping")).toDouble(20.0));
-      }
-    }
-
-    // Step 6: Read optional per-FontRole overrides (size, weight)
-    // JSON format: "fonts": { "Body": { "size": 10, "weight": 500 }, ... }
-    _fontOverrides = {};  // reset before overlay
-    const auto fontsObj = root.value(QStringLiteral("fonts")).toObject();
-    if (!fontsObj.isEmpty()) {
-      for (std::size_t i = 0; i < kFontRoleCount; ++i) {
-        const auto roleObj = fontsObj.value(QLatin1String(kFontRoleNames[i])).toObject();
-        if (roleObj.isEmpty()) {
-          continue;
-        }
-        if (roleObj.contains(QStringLiteral("size"))) {
-          _fontOverrides[i].sizeInPt = roleObj.value(QStringLiteral("size")).toInt();
-        }
-        if (roleObj.contains(QStringLiteral("weight"))) {
-          _fontOverrides[i].weight = roleObj.value(QStringLiteral("weight")).toInt();
-        }
+      if (!layers.empty()) {
+        _shadowTokensByKey[it.key().toStdString()] = std::move(layers);
       }
     }
   }
@@ -387,94 +732,16 @@ namespace matcha::gui {
   // ============================================================================
 
   void NyanTheme::BuildFonts() {
-    // Detect platform font family
-    QString sansFamily;
-    QString monoFamily;
-
-#if defined(Q_OS_WIN)
-    sansFamily = QStringLiteral("Segoe UI");
-    monoFamily = QStringLiteral("Cascadia Code");
-#elif defined(Q_OS_MACOS)
-    sansFamily = QStringLiteral("SF Pro Text");
-    monoFamily = QStringLiteral("SF Mono");
-#else
-    sansFamily = QStringLiteral("Noto Sans");
-    monoFamily = QStringLiteral("Noto Sans Mono");
-#endif
-
-    // Verify family availability, fallback to system default
-    const auto families = QFontDatabase::families();
-    if (!families.contains(sansFamily)) {
-      sansFamily = QFontDatabase::systemFont(QFontDatabase::GeneralFont).family();
-    }
-    if (!families.contains(monoFamily)) {
-      monoFamily = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
-    }
-
-    // Helper: scale a base pt size by _fontScale, clamp to >= 6pt
-    auto scaledPt = [this](int basePt) -> int {
-      const int scaled = static_cast<int>(std::lroundf(static_cast<float>(basePt) * _fontScale));
-      return std::max(scaled, 6);  // minimum 6pt for readability
-    };
-
-    // Body: 9pt Normal
-    _fonts[std::to_underlying(FontRole::fontSizeSM)] = {
-      .family = sansFamily,
-      .sizeInPt = scaledPt(9),
-      .weight = 400,
-    };
-
-    // BodyMedium: 9pt Medium
-    _fonts[std::to_underlying(FontRole::fontSizeSM)] = {
-      .family = sansFamily,
-      .sizeInPt = scaledPt(9),
-      .weight = 500,
-    };
-
-    // BodyBold: 9pt Bold
-    _fonts[std::to_underlying(FontRole::fontSizeSM)] = {
-      .family = sansFamily,
-      .sizeInPt = scaledPt(9),
-      .weight = 700,
-    };
-
-    // Caption: 8pt Normal
-    _fonts[std::to_underlying(FontRole::fontSizeXS)] = {
-      .family = sansFamily,
-      .sizeInPt = scaledPt(8),
-      .weight = 400,
-    };
-
-    // Heading: 12pt DemiBold
-    _fonts[std::to_underlying(FontRole::fontSizeLG)] = {
-      .family = sansFamily,
-      .sizeInPt = scaledPt(12),
-      .weight = 600,
-    };
-
-    // Monospace: 9pt Normal mono
-    _fonts[std::to_underlying(FontRole::fontSizeSM)] = {
-      .family = monoFamily,
-      .sizeInPt = scaledPt(9),
-      .weight = 400,
-    };
-
-    // ToolTip: 8pt Normal
-    _fonts[std::to_underlying(FontRole::fontSizeXS)] = {
-      .family = sansFamily,
-      .sizeInPt = scaledPt(8),
-      .weight = 400,
-    };
-
-    // Apply per-FontRole JSON overrides (size, weight) from palette
+    const auto fallback = ScaledFontSpec(DefaultFontSpec(DetectPlatformFontFamilies().sansFamily, FontSpec{}.sizeInPt), _fontScale);
     for (std::size_t i = 0; i < kFontRoleCount; ++i) {
-      const auto& ov = _fontOverrides[i];
-      if (ov.sizeInPt) {
-        _fonts[i].sizeInPt = scaledPt(*ov.sizeInPt);
+      auto spec = fallback;
+      const auto role = static_cast<FontRole>(static_cast<uint8_t>(i));
+      if (const auto key = LegacyFontRoleKey(role)) {
+        if (const auto resolved = Font(*key)) {
+          spec = *resolved;
+        }
       }
-      if (ov.weight) {
-        _fonts[i].weight = *ov.weight;
-      }
+      _fonts[i] = spec;
     }
   }
 
@@ -1008,10 +1275,79 @@ namespace matcha::gui {
   // Global Token Queries
   // ============================================================================
 
+  auto NyanTheme::Color(std::string_view key) const -> std::optional<QColor> {
+    const auto it = _colorTokensByKey.find(TokenKey(key));
+    if (it == _colorTokensByKey.end()) {
+      return std::nullopt;
+    }
+    return it->second;
+  }
+
+  auto NyanTheme::Gradient(std::string_view key) const -> std::optional<GradientSpec> {
+    const auto it = _gradientTokensByKey.find(TokenKey(key));
+    if (it == _gradientTokensByKey.end()) {
+      return std::nullopt;
+    }
+    return ParseGradientToken(it->second, key);
+  }
+
+  auto NyanTheme::DimensionPx(std::string_view key) const -> std::optional<int> {
+    const auto it = _dimensionTokensByKey.find(TokenKey(key));
+    if (it == _dimensionTokensByKey.end()) {
+      return std::nullopt;
+    }
+    return it->second;
+  }
+
+  auto NyanTheme::Font(std::string_view key) const -> std::optional<FontSpec> {
+    const auto it = _fontTokensByKey.find(TokenKey(key));
+    if (it == _fontTokensByKey.end()) {
+      return std::nullopt;
+    }
+
+    auto spec = it->second;
+    if (spec.family.isEmpty()) {
+      spec.family = DetectPlatformFontFamilies().sansFamily;
+    }
+    return ScaledFontSpec(spec, _fontScale);
+  }
+
+  auto NyanTheme::Shadow(std::string_view key) const -> std::optional<std::span<const ShadowLayerSpec>> {
+    const auto it = _shadowTokensByKey.find(TokenKey(key));
+    if (it == _shadowTokensByKey.end()) {
+      return std::nullopt;
+    }
+    return std::span<const ShadowLayerSpec>{it->second.data(), it->second.size()};
+  }
+
+  auto NyanTheme::HasToken(TokenKind kind, std::string_view key) const -> bool {
+    const auto storageKey = TokenKey(key);
+    switch (kind) {
+      case TokenKind::Color:
+        return _colorTokensByKey.contains(storageKey);
+      case TokenKind::Gradient:
+        return _gradientTokensByKey.contains(storageKey);
+      case TokenKind::Font:
+        return _fontTokensByKey.contains(storageKey);
+      case TokenKind::Dimension:
+        return _dimensionTokensByKey.contains(storageKey);
+      case TokenKind::Shadow:
+        return _shadowTokensByKey.contains(storageKey);
+    }
+    return false;
+  }
+
   auto NyanTheme::Color(ColorToken token) const -> QColor {
+    if (const auto key = LegacyColorTokenKey(token)) {
+      if (const auto color = Color(*key)) {
+        return *color;
+      }
+    }
+
     const auto idx = std::to_underlying(token);
     if (idx >= kColorTokenCount) {
-      return QColor(255, 0, 0);
+      qWarning() << "Invalid color token index:" << idx;
+      return _colors[std::to_underlying(ColorToken::colorPrimaryBase)];
     }
     return _colors[idx];
   }
@@ -1023,6 +1359,14 @@ namespace matcha::gui {
   }
 
   auto NyanTheme::Font(FontRole role) const -> const FontSpec& {
+    if (const auto key = LegacyFontRoleKey(role)) {
+      if (const auto spec = Font(*key)) {
+        thread_local FontSpec legacyFontSpec;
+        legacyFontSpec = *spec;
+        return legacyFontSpec;
+      }
+    }
+
     const auto idx = std::to_underlying(role);
     if (idx >= kFontRoleCount) {
       return _fonts[0];
@@ -1045,16 +1389,42 @@ namespace matcha::gui {
   }
 
   auto NyanTheme::SpacingPx(fw::SpaceToken token) const -> int {
-    const int basePx = fw::ToPixels(token);
+    const int basePx = [this, token] {
+      if (const auto key = LegacySpaceTokenKey(token)) {
+        if (const auto dimension = DimensionPx(*key)) {
+          return *dimension;
+        }
+      }
+      return fw::ToPixels(token);
+    }();
     const float scale = CurrentDensityScale();
     return static_cast<int>(std::lroundf(static_cast<float>(basePx) * scale));
   }
 
   auto NyanTheme::Radius(fw::RadiusToken token) const -> int {
+    if (const auto key = LegacyRadiusTokenKey(token)) {
+      if (const auto dimension = DimensionPx(*key)) {
+        return *dimension;
+      }
+    }
     return fw::ToPixels(token);
   }
 
   auto NyanTheme::Shadow(ShadowToken token) const -> const ShadowSpec& {
+    if (const auto key = LegacyShadowTokenKey(token)) {
+      if (const auto layers = Shadow(*key); layers && !layers->empty()) {
+        thread_local ShadowSpec legacyShadowSpec;
+        const auto& firstLayer = layers->front();
+        legacyShadowSpec = ShadowSpec{
+            .offsetX = firstLayer.offsetX,
+            .offsetY = firstLayer.offsetY,
+            .blurRadius = firstLayer.blurRadius,
+            .opacity = firstLayer.color.isValid() ? firstLayer.color.alphaF() : 0.0,
+        };
+        return legacyShadowSpec;
+      }
+    }
+
     const auto idx = std::to_underlying(token);
     if (idx >= kShadowTokenCount) {
       return _shadows[0];
@@ -1258,7 +1628,7 @@ namespace matcha::gui {
     if (it == _dynamicColors.end()) {
       return std::nullopt;
     }
-    return (_currentMode == ThemeMode::Light) ? it->second.lightValue : it->second.darkValue;
+    return it->second.lightValue;
   }
 
   auto NyanTheme::DynamicFont(std::string_view key) const -> std::optional<FontSpec> {

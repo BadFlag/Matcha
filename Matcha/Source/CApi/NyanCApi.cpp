@@ -610,11 +610,9 @@ NYAN_API NyanErrorCode NyanTheme_Register(NyanAppHandle app,
     if (!state->app) { return NYAN_ERR_NOT_INITIALIZED; }
 
     try {
-        const auto mode = (isDark != 0)
-            ? matcha::gui::ThemeMode::Dark
-            : matcha::gui::ThemeMode::Light;
-        const bool ok = state->app->Theme().RegisterTheme(
-            QString::fromUtf8(name), QString::fromUtf8(jsonPath), mode);
+        Q_UNUSED(name);
+        Q_UNUSED(isDark);
+        const bool ok = state->app->Theme().RegisterTheme(QString::fromUtf8(jsonPath));
         return ok ? NYAN_OK : NYAN_ERR_INVALID_ARGUMENT;
     } catch (...) {
         return NYAN_ERR_INTERNAL;

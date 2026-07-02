@@ -113,6 +113,16 @@ namespace matcha::fw {
     paddingXL = 28,
     paddingXXL = 32,
 
+    // Compatibility aliases for pre-consumer-token call sites.
+    None = spaceNone,
+    Px1 = 1,
+    Px2 = marginXXXS,
+    Px4 = marginXXS,
+    Px6 = 6,
+    Px8 = marginXS,
+    Px16 = marginMS,
+    Px32 = marginXXL,
+
     Count_ = 19  ///< Number of defined spacing values. NOT a pixel value.
   };
 
@@ -175,6 +185,14 @@ namespace matcha::fw {
     borderRadiusMD = 3,
     borderRadiusLG = 6,
     borderRadiusRound = 255,  // Capsule shape
+
+    // Compatibility aliases for pre-consumer-token call sites.
+    None = borderRadiusNone,
+    Small = 2,
+    Default = borderRadiusMD,
+    Medium = 4,
+    Large = 8,
+    Round = borderRadiusRound,
 
     Count_ = 6
   };
@@ -349,6 +367,13 @@ namespace matcha::fw {
     iconSizeXXL = 56,
     iconSizeXXXL = 64,
 
+    // Compatibility aliases for pre-consumer-token call sites.
+    Xs = iconSizeXS,
+    Sm = iconSizeSM,
+    Md = iconSizeMS,
+    Lg = iconSizeMD,
+    Xl = iconSizeLG,
+
     Count_ = 13  ///< Number of defined icon size values. NOT a pixel value.
   };
 
@@ -467,6 +492,12 @@ namespace matcha::fw {
     boxShadowSecondary,
     boxShadowTertiary,
 
+    // Compatibility aliases for pre-consumer-token call sites.
+    Flat = shadow,
+    Low = boxShadow,
+    Medium = boxShadowSecondary,
+    High = boxShadowTertiary,
+
     Count_ = 4  ///< Number of defined shadow values.
   };
 
@@ -490,6 +521,15 @@ namespace matcha::fw {
     zIndexLoading = 1070,
     zIndexMaximum = 9999,
 
+    // Compatibility aliases for pre-consumer-token call sites.
+    Base = zIndexBase,
+    Elevated = zIndexElevated,
+    Dropdown = zIndexDropdown,
+    Modal = zIndexModal,
+    Popover = zIndexTooltip,
+    Overlay = zIndexLoading,
+    Maximum = zIndexMaximum,
+
     Count_ = 10  ///< Number of defined layer values. NOT a pixel value.
   };
 
@@ -507,6 +547,12 @@ namespace matcha::fw {
     motionDurationFast = 150,
     motionDurationDefault = 200,
     motionDurationSlow = 350,
+
+    // Compatibility aliases for pre-consumer-token call sites.
+    Instant = motionBase,
+    Quick = motionDurationFast,
+    Normal = motionDurationDefault,
+    Slow = motionDurationSlow,
 
     Count_ = 4  ///< Number of defined animation values.
   };

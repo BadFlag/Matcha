@@ -1,0 +1,31 @@
+{
+  "name": "FontComplete",
+  "colors": {
+    "colorPrimary": "#0066FF"
+  },
+  "fonts": {
+    "fontXS": {
+      "family": "Fixture Sans",
+      "size": 9,
+      "weight": 500,
+      "italic": true,
+      "lineHeightMultiplier": 1.25,
+      "letterSpacing": 0.5
+    },
+    "fontSM": {
+      "size": 11,
+      "weight": 450,
+      "lineHeight": 1.5
+    },
+    "fontMS": {
+      "size": 13
+    },
+    "fontMD": {
+      "size": 15
+    },
+    "fontLG": {
+      "size": 17,
+      "weight": 700
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "FontFallback",
+  "fonts": {
+    "fontSM": {
+      "family": "",
+      "size": 13
+    },
+    "fontMS": {
+      "weight": 0,
+      "lineHeightMultiplier": 0
+    }
+  }
+}

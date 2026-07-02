@@ -78,11 +78,20 @@ namespace matcha::fw {
     [[nodiscard]] virtual auto CurrentDirection() const -> TextDirection = 0;
 
     // ========================================================================
-    // Token Queries (O(1), density-scaled)
+    // Legacy Enum Token Queries (temporary compatibility layer, O(1), density-scaled)
+    //
+    // New theme consumers should prefer string-key queries on IThemeService.
+    // These enum APIs remain only to keep existing fw/gui consumers working
+    // during the theme module migration. Do not add new JSON Token items here.
     // ========================================================================
 
     /**
      * @brief 查询间距值（逻辑像素，已应用密度缩放）。
+     *
+     * @deprecated 迁移期兼容接口。新代码应优先使用
+     *             `IThemeService::DimensionPx(std::string_view key)`。
+     *             主题模块整改完成后删除旧枚举消费 API 和兼容映射。
+     *
      * @param token 间距令牌。
      * @return basePx * densityScale，四舍五入为整数。
      */
@@ -90,6 +99,11 @@ namespace matcha::fw {
 
     /**
      * @brief 查询圆角半径值（逻辑像素）。
+     *
+     * @deprecated 迁移期兼容接口。新代码应优先使用
+     *             `IThemeService::DimensionPx(std::string_view key)`。
+     *             主题模块整改完成后删除旧枚举消费 API 和兼容映射。
+     *
      * @param token 圆角令牌。
      * @return 像素值（整数）。RadiusToken::Round 返回 255（调用者需使用 min(w,h)/2）。
      */
@@ -97,6 +111,9 @@ namespace matcha::fw {
 
     /**
      * @brief 查询动画持续时间（毫秒）。
+     *
+     * @deprecated 迁移期兼容接口。新代码不应继续扩展 AnimationsToken。
+     *             主题模块整改完成后删除旧枚举消费 API 和兼容映射。
      *
      * 当动画覆盖处于活动状态时（如测试模式），返回覆盖值。
      *

@@ -5,12 +5,11 @@
  * @brief 带有 JSON 调色板加载功能的 IThemeService 具体实现。
  *
  * `NyanTheme` 是 `IThemeService` 的唯一具体实现。
- * 它加载 Light.json / Dark.json 种子调色板（直接包含 71 个 ColorToken 值），
- * 检测平台字体，根据高度级别推导阴影参数，并为每种 WidgetKind 构建
- * 带有默认几何 Token + 变体颜色矩阵的样式表。
+ * 它加载主题 JSON 中的消费级 Token，并为 Qt Widgets 提供查询、
+ * 样式解析、QSS 和图标适配。
  *
- * 存储使用平坦数组以实现 O(1) 查找。所有 const 查询方法都是无锁读取 ——
- * 数组在两次 `SetTheme()` 调用之间是不可变的。
+ * 新代码应优先使用字符串 key 查询接口。旧枚举查询接口仅作为
+ * 主题模块整改期的临时兼容层，整改完成后删除。
  *
  * @see 05_Greenfield_Plan.md 第 2.6 节 NyanTheme 设计
  * @see IThemeService.h 抽象接口定义
@@ -21,6 +20,7 @@
 
 #include <QColor>
 #include <QEasingCurve>
+#include <QJsonObject>
 #include <QPixmap>
 #include <QString>
 #include <array>
@@ -35,10 +35,10 @@ namespace matcha::gui {
    * @brief 具体的主题引擎实现。
    *
    * **生命周期**：
-   * 1. 使用调色板搜索路径（包含 Light.json / Dark.json 的目录）构造。
-   * 2. 调用 `SetTheme(kThemeLight)` 执行初始 Token 构建。
+   * 1. 使用主题 JSON 搜索路径构造。
+   * 2. 注册并调用 `SetTheme(name)` 执行初始 Token 构建。
    * 3. 控件通过 `IThemeService` 接口查询 Token。
-   * 4. 调用 `SetTheme(kThemeDark)` 切换主题；所有 ThemeAware 控件自动更新。
+   * 4. 再次调用 `SetTheme(name)` 切换主题；所有 ThemeAware 控件自动更新。
    *
    * **线程安全**：所有 const 查询方法对于并发读取是安全的。
    * `SetTheme()` 必须仅从 GUI 线程调用（会发出信号）。
@@ -80,16 +80,24 @@ namespace matcha::gui {
 
     [[nodiscard]] auto CurrentTheme() const -> const QString& override;
 
-    [[nodiscard]] auto CurrentMode() const -> ThemeMode override;
+    auto RegisterTheme(const QString& jsonPath) -> bool override;
 
-    auto RegisterTheme(const QString& name, const QString& jsonPath, ThemeMode mode) -> bool override;
+    [[nodiscard]] auto Color(std::string_view key) const -> std::optional<QColor> override;
+    [[nodiscard]] auto Gradient(std::string_view key) const -> std::optional<GradientSpec> override;
+    [[nodiscard]] auto DimensionPx(std::string_view key) const -> std::optional<int> override;
+    [[nodiscard]] auto Font(std::string_view key) const -> std::optional<FontSpec> override;
+    [[nodiscard]] auto Shadow(std::string_view key) const -> std::optional<std::span<const ShadowLayerSpec>> override;
+    [[nodiscard]] auto HasToken(TokenKind kind, std::string_view key) const -> bool override;
 
     [[nodiscard]] auto Color(ColorToken token) const -> QColor override;
     [[nodiscard]] auto Color(ColorToken token, InteractionState state) const -> QColor override;
+    using IThemeService::Color;
     [[nodiscard]] auto Font(FontRole role) const -> const FontSpec& override;
+    using IThemeService::Font;
     void SetFontScale(float factor) override;
     [[nodiscard]] auto FontScale() const -> float override;
     [[nodiscard]] auto Shadow(ShadowToken token) const -> const ShadowSpec& override;
+    using IThemeService::Shadow;
     [[nodiscard]] auto Easing(EasingToken easing) const -> int override;
 
     [[nodiscard]] auto ResolveStyleSheet(WidgetKind kind) const -> const WidgetStyleSheet& override;
@@ -122,6 +130,14 @@ namespace matcha::gui {
    private:
     /// @brief 加载 JSON 调色板文件并填充颜色数组。
     void LoadPalette(const QString& themeName);
+    void InitializeDefaultTokens();
+    void ApplyColorTokens(const QJsonObject& colors);
+    void ApplyColorOverrides(const QJsonObject& overrides);
+    void ApplySpringTokens(const QJsonObject& spring);
+    void ApplyFontTokens(const QJsonObject& fonts);
+    void ApplyMetricTokens(const QJsonObject& root);
+    void ApplyShadowTokens(const QJsonObject& shadows);
+    [[nodiscard]] auto ReadThemeName(const QJsonObject& root) const -> QString;
 
     /// @brief 检测平台字体并填充字体数组。
     void BuildFonts();
@@ -149,6 +165,11 @@ namespace matcha::gui {
     /// @brief 文档8.9提及的内部成员
     /// 颜色 Token 存储 初始化 LoadPalette()
     std::array<QColor, kColorTokenCount> _colors{};
+    std::unordered_map<std::string, QColor> _colorTokensByKey;
+    std::unordered_map<std::string, QString> _gradientTokensByKey;
+    std::unordered_map<std::string, FontSpec> _fontTokensByKey;
+    std::unordered_map<std::string, int> _dimensionTokensByKey;
+    std::unordered_map<std::string, std::vector<ShadowLayerSpec>> _shadowTokensByKey;
     /// @brief 字体 Token 存储 初始化 BuildFonts()
     std::array<FontSpec, kFontRoleCount> _fonts{};
     /// @brief 阴影 Token 存储 初始化 BuildShadows()
@@ -171,10 +192,10 @@ namespace matcha::gui {
     std::unordered_map<std::string, FontSpec> _dynamicFonts;
     /// @brief 动态间距 Token 存储 初始化 RegisterDynamicSpacings()
     std::unordered_map<std::string, int> _dynamicSpacings;
-    /// @brief 已注册的主题条目：JSON 路径 + 亮色/暗色分类
+    /// @brief 已注册的主题条目：主题名 + JSON 路径。
     struct ThemeEntry {
+      QString name;
       QString jsonPath;
-      ThemeMode mode;
     };
     /// @brief 动态主题注册表：主题名称 -> 主题条目 初始化 RegisterTheme()
     std::unordered_map<std::string, ThemeEntry> _themeRegistry;
@@ -182,8 +203,6 @@ namespace matcha::gui {
     std::vector<ComponentOverride> _overrideRegistry;
     /// @brief 当前应用的主题名称 初始化 SetTheme()
     QString _currentTheme = kThemeLight;
-    /// @brief 当前应用的主题模式 初始化 SetTheme()
-    ThemeMode _currentMode = ThemeMode::Light;
     /// @brief 当前应用的字体缩放系数 初始化在构造函数中，默认1.0F
     float _fontScale = 1.0F;  ///< 全局字体缩放系数
     /// @brief 当前应用的高度级别 初始化在构造函数中，有默认值
@@ -211,15 +230,6 @@ namespace matcha::gui {
       }
       return a;
     }();
-
-
-    /// @brief 来自调色板的每 FontRole JSON 覆盖（大小、字重）。
-    /// 由 LoadPalette() 填充，由 BuildFonts() 消费。
-    struct FontOverride {
-      std::optional<int> sizeInPt;
-      std::optional<int> weight;
-    };
-    std::array<FontOverride, kFontRoleCount> _fontOverrides{};
 
 
     /// @brief 每个控件种类的变体存储（自有，样式表指向这些存储区）。
