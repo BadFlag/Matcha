@@ -117,6 +117,7 @@ namespace matcha::gui {
     auto RegisterIconDirectory(std::string_view uriPrefix, const QString& dirPath) -> int override;
 
     void RegisterDynamicTokens(std::span<const DynamicColorDef> defs) override;
+    void RegisterDynamicThemeColors(std::span<const DynamicThemeColorDef> defs) override;
     void RegisterDynamicFonts(std::span<const DynamicFontDef> defs) override;
     void RegisterDynamicSpacings(std::span<const DynamicSpacingDef> defs) override;
     [[nodiscard]] auto DynamicColor(std::string_view key) const -> std::optional<QColor> override;
@@ -130,13 +131,14 @@ namespace matcha::gui {
    private:
     /// @brief 加载 JSON 调色板文件并填充颜色数组。
     void LoadPalette(const QString& themeName);
+    [[nodiscard]] auto TryLoadPalette(const QString& themeName) -> bool;
     void InitializeDefaultTokens();
     void ApplyColorTokens(const QJsonObject& colors);
     void ApplyColorOverrides(const QJsonObject& overrides);
     void ApplySpringTokens(const QJsonObject& spring);
     void ApplyFontTokens(const QJsonObject& fonts);
     void ApplyMetricTokens(const QJsonObject& root);
-    void ApplyShadowTokens(const QJsonObject& shadows);
+    [[nodiscard]] auto ApplyShadowTokens(const QJsonObject& shadows) -> bool;
     [[nodiscard]] auto ReadThemeName(const QJsonObject& root) const -> QString;
 
     /// @brief 检测平台字体并填充字体数组。
@@ -166,7 +168,7 @@ namespace matcha::gui {
     /// 颜色 Token 存储 初始化 LoadPalette()
     std::array<QColor, kColorTokenCount> _colors{};
     std::unordered_map<std::string, QColor> _colorTokensByKey;
-    std::unordered_map<std::string, QString> _gradientTokensByKey;
+    std::unordered_map<std::string, GradientSpec> _gradientTokensByKey;
     std::unordered_map<std::string, FontSpec> _fontTokensByKey;
     std::unordered_map<std::string, int> _dimensionTokensByKey;
     std::unordered_map<std::string, std::vector<ShadowLayerSpec>> _shadowTokensByKey;
@@ -182,12 +184,9 @@ namespace matcha::gui {
     /// @brief 图标注册表：URI -> 文件系统路径（由 RegisterIconDirectory 自动填充）。
     std::unordered_map<std::string, QString> _iconRegistry;
     /// @brief 动态颜色 Token，按键字符串索引。
-    struct DynamicColorEntry {
-      QColor lightValue;
-      QColor darkValue;
-    };
     /// @brief 动态颜色 Token 存储 初始化 RegisterDynamicTokens()
-    std::unordered_map<std::string, DynamicColorEntry> _dynamicColors;
+    std::unordered_map<std::string, QColor> _dynamicColors;
+    std::unordered_map<std::string, std::unordered_map<std::string, QColor>> _dynamicThemeColors;
     /// @brief 动态字体 Token 存储 初始化 RegisterDynamicFonts()
     std::unordered_map<std::string, FontSpec> _dynamicFonts;
     /// @brief 动态间距 Token 存储 初始化 RegisterDynamicSpacings()

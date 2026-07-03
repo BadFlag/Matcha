@@ -278,7 +278,16 @@ namespace matcha::gui {
       }
     }
 
-    [[nodiscard]] auto ParseGradientToken(QString value, std::string_view key) -> std::optional<GradientSpec> {
+    [[nodiscard]] auto LegacyShadowFromLayer(const ShadowLayerSpec& layer) -> ShadowSpec {
+      return ShadowSpec{
+          .offsetX = layer.offsetX,
+          .offsetY = layer.offsetY,
+          .blurRadius = layer.blurRadius,
+          .opacity = layer.color.isValid() ? layer.color.alphaF() : 0.0,
+      };
+    }
+
+    [[nodiscard]] auto ParsePipeGradientToken(QString value, std::string_view key) -> std::optional<GradientSpec> {
       const auto stops = value.split(u'|', Qt::SkipEmptyParts);
       if (stops.size() < 2) {
         qWarning() << "Invalid gradient token:" << QString::fromUtf8(key.data(), static_cast<qsizetype>(key.size()))
@@ -323,15 +332,24 @@ namespace matcha::gui {
   // ============================================================================
 
   void NyanTheme::SetTheme(const QString& name) {
-    _currentTheme = name;
-
     const auto regKey = name.toStdString();
     auto regIt = _themeRegistry.find(regKey);
     if (regIt == _themeRegistry.end()) {
       // 没有找到直接退出，必须先注册主题，然后再设置主题才能生效。[TODO 缺少告警打印]
+      const QString candidate = _palettePath + u'/' + name + QStringLiteral(".json");
+      if (!RegisterTheme(candidate)) {
+        qWarning() << "Theme is not registered:" << name;
+        return;
+      }
+      regIt = _themeRegistry.find(regKey);
+      if (regIt == _themeRegistry.end()) {
+        qWarning() << "Registered theme name does not match requested theme:" << name;
+        return;
+      }
+    }
+    if (!TryLoadPalette(name)) {
       return;
     }
-    LoadPalette(name);
     /*
     BuildFonts();
     BuildShadows();
@@ -359,7 +377,8 @@ namespace matcha::gui {
 
     BuildGlobalStyleSheet();*/
 
-    emit ThemeChanged(name);
+    _currentTheme = name;
+    emit ThemeChanged(_currentTheme);
   }
 
   auto NyanTheme::CurrentTheme() const -> const QString& {
@@ -465,8 +484,10 @@ namespace matcha::gui {
   }
 
   void NyanTheme::LoadPalette(const QString& themeName) {
-    InitializeDefaultTokens();
+    (void)TryLoadPalette(themeName);
+  }
 
+  auto NyanTheme::TryLoadPalette(const QString& themeName) -> bool {
     // Resolve the JSON file path for this theme
     QString filePath;
     const auto regKey = themeName.toStdString();
@@ -483,7 +504,7 @@ namespace matcha::gui {
       }
       else {
         qWarning() << "Theme file not found:" << candidate;
-        return;
+        return false;
       }
     }
 
@@ -496,30 +517,52 @@ namespace matcha::gui {
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
       qWarning() << "Failed to open theme file:" << filePath << file.errorString();
-      return;
+      return false;
     }
 
     const auto doc = QJsonDocument::fromJson(file.readAll());
     if (!doc.isObject()) {
       qWarning() << "Theme JSON root is not an object:" << filePath;
-      return;
+      return false;
     }
 
     const auto root = doc.object();
     const auto name = ReadThemeName(root);
     if (name.isEmpty() || name != themeName) {
       qWarning() << "Theme name mismatch:" << filePath << "expected" << themeName << "actual" << name;
-      return;
+      return false;
     }
 
+    const auto previousColors = _colors;
+    const auto previousColorTokensByKey = _colorTokensByKey;
+    const auto previousGradientTokensByKey = _gradientTokensByKey;
+    const auto previousFontTokensByKey = _fontTokensByKey;
+    const auto previousDimensionTokensByKey = _dimensionTokensByKey;
+    const auto previousShadowTokensByKey = _shadowTokensByKey;
+    const auto previousFonts = _fonts;
+    const auto previousShadows = _shadows;
+    const auto previousSpring = _springS;
+
+    InitializeDefaultTokens();
     ApplyColorTokens(root.value(QStringLiteral("colors")).toObject());
     ApplyColorOverrides(root.value(QStringLiteral("colorOverrides")).toObject());
     ApplySpringTokens(root.value(QStringLiteral("spring")).toObject());
     ApplyFontTokens(root.value(QStringLiteral("fonts")).toObject());
     BuildFonts();
     ApplyMetricTokens(root);
-    ApplyShadowTokens(root.value(QStringLiteral("shadows")).toObject());
-    return;
+    if (!ApplyShadowTokens(root.value(QStringLiteral("shadows")).toObject())) {
+      _colors = previousColors;
+      _colorTokensByKey = previousColorTokensByKey;
+      _gradientTokensByKey = previousGradientTokensByKey;
+      _fontTokensByKey = previousFontTokensByKey;
+      _dimensionTokensByKey = previousDimensionTokensByKey;
+      _shadowTokensByKey = previousShadowTokensByKey;
+      _fonts = previousFonts;
+      _shadows = previousShadows;
+      _springS = previousSpring;
+      return false;
+    }
+    return true;
   }
 
   auto NyanTheme::ReadThemeName(const QJsonObject& root) const -> QString {
@@ -540,7 +583,9 @@ namespace matcha::gui {
       }
 
       if (it.key().endsWith(QStringLiteral("Gradient")) || value.contains(u'|')) {
-        _gradientTokensByKey[key] = value;
+        if (const auto gradient = ParsePipeGradientToken(value, key)) {
+          _gradientTokensByKey[key] = *gradient;
+        }
         continue;
       }
 
@@ -677,15 +722,20 @@ namespace matcha::gui {
     }
   }
 
-  void NyanTheme::ApplyShadowTokens(const QJsonObject& shadows) {
+  auto NyanTheme::ApplyShadowTokens(const QJsonObject& shadows) -> bool {
     if (shadows.isEmpty()) {
-      return;
+      return true;
     }
 
+    std::unordered_map<std::string, std::vector<ShadowLayerSpec>> parsed;
+    parsed.reserve(static_cast<std::size_t>(shadows.size()));
+
     for (auto it = shadows.constBegin(); it != shadows.constEnd(); ++it) {
+      const auto tokenName = it.key();
       const auto layersJson = it.value().toArray();
       if (layersJson.isEmpty()) {
-        continue;
+        qWarning() << "Invalid shadow token: expected non-empty layer array" << tokenName;
+        return false;
       }
 
       std::vector<ShadowLayerSpec> layers;
@@ -694,12 +744,24 @@ namespace matcha::gui {
       for (const auto& layerValue : layersJson) {
         const auto layerObj = layerValue.toObject();
         if (layerObj.isEmpty()) {
-          continue;
+          qWarning() << "Invalid shadow layer: expected object" << tokenName;
+          return false;
         }
 
         const auto orientation = layerObj.value(QStringLiteral("orientation")).toArray();
         if (orientation.size() < 2 || !orientation.at(0).isDouble() || !orientation.at(1).isDouble()) {
-          continue;
+          qWarning() << "Invalid shadow layer orientation" << tokenName;
+          return false;
+        }
+        if (!layerObj.value(QStringLiteral("blur")).isDouble() || !layerObj.value(QStringLiteral("spread")).isDouble()) {
+          qWarning() << "Invalid shadow layer blur/spread" << tokenName;
+          return false;
+        }
+        const auto color = layerObj.value(QStringLiteral("color")).toArray();
+        if (color.size() < 4 || !color.at(0).isDouble() || !color.at(1).isDouble() || !color.at(2).isDouble()
+            || !color.at(3).isDouble()) {
+          qWarning() << "Invalid shadow layer color" << tokenName;
+          return false;
         }
 
         ShadowLayerSpec layer;
@@ -707,24 +769,21 @@ namespace matcha::gui {
         layer.offsetY = orientation.at(1).toInt();
         layer.blurRadius = layerObj.value(QStringLiteral("blur")).toInt();
         layer.spread = layerObj.value(QStringLiteral("spread")).toInt();
-
-        const auto color = layerObj.value(QStringLiteral("color")).toArray();
-        if (color.size() >= 4) {
-          layer.color = QColor(
-              color.at(0).toInt(),
-              color.at(1).toInt(),
-              color.at(2).toInt(),
-              color.at(3).toInt()
-          );
-        }
+        layer.color = QColor(
+            color.at(0).toInt(),
+            color.at(1).toInt(),
+            color.at(2).toInt(),
+            color.at(3).toInt()
+        );
 
         layers.push_back(layer);
       }
 
-      if (!layers.empty()) {
-        _shadowTokensByKey[it.key().toStdString()] = std::move(layers);
-      }
+      parsed[tokenName.toStdString()] = std::move(layers);
     }
+
+    _shadowTokensByKey = std::move(parsed);
+    return true;
   }
 
   // ============================================================================
@@ -782,13 +841,6 @@ namespace matcha::gui {
       .opacity = 0.15,
     };
 
-    // Window: 8px margin + multi-pass blur
-    _shadows[std::to_underlying(ShadowToken::boxShadowTertiary)] = {
-      .offsetX = 0,
-      .offsetY = 4,
-      .blurRadius = 16,
-      .opacity = 0.20,
-    };
   }
 
   // ============================================================================
@@ -1288,7 +1340,7 @@ namespace matcha::gui {
     if (it == _gradientTokensByKey.end()) {
       return std::nullopt;
     }
-    return ParseGradientToken(it->second, key);
+    return it->second;
   }
 
   auto NyanTheme::DimensionPx(std::string_view key) const -> std::optional<int> {
@@ -1413,14 +1465,9 @@ namespace matcha::gui {
   auto NyanTheme::Shadow(ShadowToken token) const -> const ShadowSpec& {
     if (const auto key = LegacyShadowTokenKey(token)) {
       if (const auto layers = Shadow(*key); layers && !layers->empty()) {
+        // Legacy enum API collapses the mapped multi-layer token to its first layer.
         thread_local ShadowSpec legacyShadowSpec;
-        const auto& firstLayer = layers->front();
-        legacyShadowSpec = ShadowSpec{
-            .offsetX = firstLayer.offsetX,
-            .offsetY = firstLayer.offsetY,
-            .blurRadius = firstLayer.blurRadius,
-            .opacity = firstLayer.color.isValid() ? firstLayer.color.alphaF() : 0.0,
-        };
+        legacyShadowSpec = LegacyShadowFromLayer(layers->front());
         return legacyShadowSpec;
       }
     }
@@ -1604,10 +1651,16 @@ namespace matcha::gui {
 
   void NyanTheme::RegisterDynamicTokens(std::span<const DynamicColorDef> defs) {
     for (const auto& def : defs) {
-      _dynamicColors[std::string(def.key)] = DynamicColorEntry{
-        .lightValue = def.lightValue,
-        .darkValue = def.darkValue,
-      };
+      _dynamicColors[std::string(def.key)] = def.value;
+    }
+  }
+
+  void NyanTheme::RegisterDynamicThemeColors(std::span<const DynamicThemeColorDef> defs) {
+    for (const auto& def : defs) {
+      if (def.themeName.empty()) {
+        continue;
+      }
+      _dynamicThemeColors[std::string(def.key)][std::string(def.themeName)] = def.value;
     }
   }
 
@@ -1624,11 +1677,20 @@ namespace matcha::gui {
   }
 
   auto NyanTheme::DynamicColor(std::string_view key) const -> std::optional<QColor> {
-    const auto it = _dynamicColors.find(std::string(key));
-    if (it == _dynamicColors.end()) {
-      return std::nullopt;
+    const auto tokenKey = std::string(key);
+    const auto themedIt = _dynamicThemeColors.find(tokenKey);
+    if (themedIt != _dynamicThemeColors.end()) {
+      const auto themeIt = themedIt->second.find(_currentTheme.toStdString());
+      if (themeIt != themedIt->second.end()) {
+        return themeIt->second;
+      }
     }
-    return it->second.lightValue;
+
+    const auto it = _dynamicColors.find(tokenKey);
+    if (it != _dynamicColors.end()) {
+      return it->second;
+    }
+    return std::nullopt;
   }
 
   auto NyanTheme::DynamicFont(std::string_view key) const -> std::optional<FontSpec> {
@@ -1656,6 +1718,7 @@ namespace matcha::gui {
     for (const auto& key : keys) {
       auto k = std::string(key);
       _dynamicColors.erase(k);
+      _dynamicThemeColors.erase(k);
       _dynamicFonts.erase(k);
       _dynamicSpacings.erase(k);
     }

@@ -10,7 +10,9 @@
 #include "QtAppGuard.h"
 
 #include <QColor>
+#include <QFile>
 #include <QString>
+#include <QTemporaryDir>
 
 #include <array>
 #include <utility>
@@ -49,6 +51,95 @@ TEST_CASE("RegisterTheme uses json name and rejects invalid inputs") {
     CHECK_FALSE(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/MissingNameTheme.json")));
 }
 
+TEST_CASE("RegisterTheme only uses json root name as theme identity") {
+    matcha::test::QtAppGuard::Ensure();
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    QTemporaryDir tempDir;
+    REQUIRE(tempDir.isValid());
+    const auto path = tempDir.filePath(QStringLiteral("PathNameIsIgnored.json"));
+
+    QFile file(path);
+    REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    const auto json = QByteArray(R"({
+        "name": "JsonDeclaredName",
+        "colors": {
+            "colorPrimary": "#112233"
+        }
+    })");
+    REQUIRE(file.write(json) == json.size());
+    file.close();
+
+    REQUIRE(theme.RegisterTheme(path));
+
+    theme.SetTheme(QStringLiteral("PathNameIsIgnored"));
+    CHECK(theme.CurrentTheme() == kThemeLight);
+
+    theme.SetTheme(QStringLiteral("JsonDeclaredName"));
+    CHECK(theme.CurrentTheme() == QStringLiteral("JsonDeclaredName"));
+    CHECK(theme.Color("colorPrimary") == QColor::fromString(QStringLiteral("#112233")));
+}
+
+TEST_CASE("C API migration boundary ignores passed name and isDark") {
+    matcha::test::QtAppGuard::Ensure();
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    const auto registerThroughCapiBoundary =
+        [](NyanTheme& service, const char* name, const QString& jsonPath, int isDark) {
+            (void)name;
+            (void)isDark;
+            return service.RegisterTheme(jsonPath);
+        };
+
+    REQUIRE(registerThroughCapiBoundary(
+        theme,
+        "CallerProvidedName",
+        QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/HighContrast.json"),
+        1
+    ));
+
+    theme.SetTheme(QStringLiteral("CallerProvidedName"));
+    CHECK(theme.CurrentTheme() == kThemeLight);
+
+    theme.SetTheme(kThemeHighContrast);
+    CHECK(theme.CurrentTheme() == kThemeHighContrast);
+}
+
+TEST_CASE("SetTheme failures do not change current theme or reset loaded tokens") {
+    matcha::test::QtAppGuard::Ensure();
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+    const auto lightPrimary = theme.Color("colorPrimary");
+    REQUIRE(lightPrimary.has_value());
+
+    theme.SetTheme(QStringLiteral("UnregisteredTheme"));
+    CHECK(theme.CurrentTheme() == kThemeLight);
+    CHECK(theme.Color("colorPrimary") == lightPrimary);
+
+    QTemporaryDir tempDir;
+    REQUIRE(tempDir.isValid());
+    const auto path = tempDir.filePath(QStringLiteral("Breakable.json"));
+    {
+        QFile file(path);
+        REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        const auto validJson = QByteArray(R"({"name":"Breakable","colors":{"colorPrimary":"#445566"}})");
+        REQUIRE(file.write(validJson) == validJson.size());
+    }
+    REQUIRE(theme.RegisterTheme(path));
+    {
+        QFile file(path);
+        REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        const auto invalidJson = QByteArray(R"({"name":"Breakable")");
+        REQUIRE(file.write(invalidJson) == invalidJson.size());
+    }
+
+    theme.SetTheme(QStringLiteral("Breakable"));
+    CHECK(theme.CurrentTheme() == kThemeLight);
+    CHECK(theme.Color("colorPrimary") == lightPrimary);
+}
+
 TEST_CASE("Color key query returns Light.json colors and excludes gradients") {
     NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
     RegisterAndLoadLight(theme);
@@ -76,6 +167,58 @@ TEST_CASE("Gradient key query parses pipe-delimited stops") {
 
     CHECK_FALSE(theme.Gradient("colorPrimary").has_value());
     CHECK_FALSE(theme.Gradient("missingGradient").has_value());
+}
+
+TEST_CASE("Light.json exposes semantic gradient tokens as GradientSpec") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    const std::array keys = {
+        "colorPrimaryGradient",
+        "colorSuccessGradient",
+        "colorWarningGradient",
+        "colorErrorGradient",
+    };
+
+    for (const auto* key : keys) {
+        const auto gradient = theme.Gradient(key);
+        REQUIRE(gradient.has_value());
+        REQUIRE(gradient->stops.size() == 2);
+        CHECK(gradient->stops.front().position == doctest::Approx(0.0));
+        CHECK(gradient->stops.back().position == doctest::Approx(1.0));
+        CHECK(gradient->stops.front().color.isValid());
+        CHECK(gradient->stops.back().color.isValid());
+        CHECK_FALSE(theme.Color(key).has_value());
+        CHECK(theme.HasToken(TokenKind::Gradient, key));
+        CHECK_FALSE(theme.HasToken(TokenKind::Color, key));
+    }
+}
+
+TEST_CASE("Gradient parser supports multiple stops and rejects invalid definitions") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadFixture(
+        theme,
+        QStringLiteral("GradientTheme.json"),
+        QStringLiteral("GradientFixture")
+    );
+
+    const auto gradient = theme.Gradient("colorPrimaryGradient");
+    REQUIRE(gradient.has_value());
+    REQUIRE(gradient->stops.size() == 3);
+    CHECK(gradient->stops[0].position == doctest::Approx(0.0));
+    CHECK(gradient->stops[0].color == QColor::fromString(QStringLiteral("#000000")));
+    CHECK(gradient->stops[1].position == doctest::Approx(0.5));
+    CHECK(gradient->stops[1].color == QColor::fromString(QStringLiteral("#808080")));
+    CHECK(gradient->stops[2].position == doctest::Approx(1.0));
+    CHECK(gradient->stops[2].color == QColor::fromString(QStringLiteral("#FFFFFF")));
+
+    CHECK_FALSE(theme.Gradient("colorWarningGradient").has_value());
+    CHECK_FALSE(theme.HasToken(TokenKind::Gradient, "colorWarningGradient"));
+    CHECK_FALSE(theme.Color("colorWarningGradient").has_value());
+
+    CHECK_FALSE(theme.Gradient("colorErrorGradient").has_value());
+    CHECK_FALSE(theme.HasToken(TokenKind::Gradient, "colorErrorGradient"));
+    CHECK_FALSE(theme.Color("colorErrorGradient").has_value());
 }
 
 TEST_CASE("Dimension key query covers spacing radius line icon control and container groups") {
@@ -187,16 +330,30 @@ TEST_CASE("Shadow key query returns full multi-layer structure") {
     NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
     RegisterAndLoadLight(theme);
 
-    const auto shadow = theme.Shadow("shadowSM");
-    REQUIRE(shadow.has_value());
-    REQUIRE(shadow->size() == 3);
+    const auto shadowSM = theme.Shadow("shadowSM");
+    REQUIRE(shadowSM.has_value());
+    REQUIRE(shadowSM->size() == 3);
 
-    const auto& first = shadow->front();
+    const auto& first = shadowSM->front();
     CHECK(first.offsetX == 0);
     CHECK(first.offsetY == 1);
     CHECK(first.blurRadius == 2);
     CHECK(first.spread == -2);
     CHECK(first.color == QColor(0, 10, 26, 40));
+
+    const auto shadowMS = theme.Shadow("shadowMS");
+    REQUIRE(shadowMS.has_value());
+    REQUIRE(shadowMS->size() == 3);
+    CHECK(shadowMS->front().offsetY == 3);
+    CHECK(shadowMS->front().blurRadius == 6);
+    CHECK(shadowMS->front().spread == -4);
+
+    const auto shadowMD = theme.Shadow("shadowMD");
+    REQUIRE(shadowMD.has_value());
+    REQUIRE(shadowMD->size() == 3);
+    CHECK(shadowMD->front().offsetY == 6);
+    CHECK(shadowMD->front().blurRadius == 16);
+    CHECK(shadowMD->front().spread == -8);
 
     CHECK_FALSE(theme.Shadow("missingShadow").has_value());
 }
@@ -214,6 +371,9 @@ TEST_CASE("HasToken checks token existence without fallback") {
     CHECK_FALSE(theme.HasToken(TokenKind::Color, "colorPrimaryGradient"));
     CHECK_FALSE(theme.HasToken(TokenKind::Gradient, "colorPrimary"));
     CHECK_FALSE(theme.HasToken(TokenKind::Dimension, "missingDimension"));
+    CHECK_FALSE(theme.HasToken(TokenKind::Shadow, "missingShadow"));
+    CHECK_FALSE(theme.HasToken(TokenKind::Shadow, "boxShadow"));
+    CHECK_FALSE(theme.HasToken(TokenKind::Shadow, "shadow"));
 }
 
 TEST_CASE("Legacy enum APIs map through new key stores during migration") {
@@ -245,25 +405,168 @@ TEST_CASE("Legacy enum APIs map through new key stores during migration") {
     CHECK(shadow.opacity > 0.0);
 }
 
+TEST_CASE("Legacy ShadowToken compatibility maps to first layer of shadow key") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadFixture(
+        theme,
+        QStringLiteral("ShadowTheme.json"),
+        QStringLiteral("ShadowFixture")
+    );
+
+    const auto& flat = theme.Shadow(ShadowToken::shadow);
+    CHECK(flat.offsetX == 0);
+    CHECK(flat.offsetY == 0);
+    CHECK(flat.blurRadius == 0);
+    CHECK(flat.opacity == doctest::Approx(0.0));
+
+    const auto& low = theme.Shadow(ShadowToken::boxShadow);
+    CHECK(low.offsetX == 2);
+    CHECK(low.offsetY == 4);
+    CHECK(low.blurRadius == 10);
+    CHECK(low.opacity == doctest::Approx(128.0 / 255.0));
+
+    const auto& medium = theme.Shadow(ShadowToken::boxShadowSecondary);
+    CHECK(medium.offsetX == 0);
+    CHECK(medium.offsetY == 8);
+    CHECK(medium.blurRadius == 20);
+    CHECK(medium.opacity == doctest::Approx(96.0 / 255.0));
+
+    const auto& high = theme.Shadow(ShadowToken::boxShadowTertiary);
+    CHECK(high.offsetX == 0);
+    CHECK(high.offsetY == 12);
+    CHECK(high.blurRadius == 30);
+    CHECK(high.opacity == doctest::Approx(64.0 / 255.0));
+}
+
+TEST_CASE("SetTheme refreshes shadow store between themes") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    auto shadow = theme.Shadow("shadowSM");
+    REQUIRE(shadow.has_value());
+    REQUIRE(shadow->size() == 3);
+    CHECK(shadow->front().offsetY == 1);
+
+    REQUIRE(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/ShadowTheme.json")));
+    theme.SetTheme(QStringLiteral("ShadowFixture"));
+    REQUIRE(theme.CurrentTheme() == QStringLiteral("ShadowFixture"));
+
+    shadow = theme.Shadow("shadowSM");
+    REQUIRE(shadow.has_value());
+    REQUIRE(shadow->size() == 1);
+    CHECK(shadow->front().offsetX == 2);
+    CHECK(shadow->front().offsetY == 4);
+    CHECK(shadow->front().blurRadius == 10);
+    CHECK(shadow->front().spread == 1);
+    CHECK(shadow->front().color == QColor(1, 2, 3, 128));
+
+    theme.SetTheme(kThemeLight);
+    REQUIRE(theme.CurrentTheme() == kThemeLight);
+    shadow = theme.Shadow("shadowSM");
+    REQUIRE(shadow.has_value());
+    REQUIRE(shadow->size() == 3);
+    CHECK(shadow->front().offsetY == 1);
+}
+
+TEST_CASE("Invalid shadow layer fields fail load without polluting current theme") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    const auto lightPrimary = theme.Color("colorPrimary");
+    REQUIRE(lightPrimary.has_value());
+    const auto lightShadow = theme.Shadow("shadowSM");
+    REQUIRE(lightShadow.has_value());
+    REQUIRE(lightShadow->size() == 3);
+    const auto lightFirstLayer = lightShadow->front();
+
+    REQUIRE(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/InvalidShadowTheme.json")));
+    theme.SetTheme(QStringLiteral("InvalidShadow"));
+
+    CHECK(theme.CurrentTheme() == kThemeLight);
+    CHECK(theme.Color("colorPrimary") == lightPrimary);
+
+    const auto shadowAfterFailure = theme.Shadow("shadowSM");
+    REQUIRE(shadowAfterFailure.has_value());
+    REQUIRE(shadowAfterFailure->size() == 3);
+    CHECK(shadowAfterFailure->front().offsetX == lightFirstLayer.offsetX);
+    CHECK(shadowAfterFailure->front().offsetY == lightFirstLayer.offsetY);
+    CHECK(shadowAfterFailure->front().blurRadius == lightFirstLayer.blurRadius);
+    CHECK(shadowAfterFailure->front().spread == lightFirstLayer.spread);
+    CHECK(shadowAfterFailure->front().color == lightFirstLayer.color);
+}
+
+TEST_CASE("Legacy gradient ColorToken does not consume gradient tokens as colors") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    CHECK_FALSE(theme.Color("colorPrimaryGradient").has_value());
+    REQUIRE(theme.Gradient("colorPrimaryGradient").has_value());
+
+    const auto legacyGradientColor = theme.Color(ColorToken::colorPrimaryGradient);
+    CHECK(legacyGradientColor.isValid());
+    CHECK(legacyGradientColor.alpha() == 0);
+}
+
 TEST_CASE("Dynamic tokens remain queryable but do not define core theme token existence") {
     NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
     RegisterAndLoadLight(theme);
+    REQUIRE(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_PALETTE_DIR "/Dark.json")));
+    REQUIRE(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/HighContrast.json")));
 
     CHECK_FALSE(theme.DynamicColor("Test/MyColor").has_value());
 
     const std::array defs = {
         IThemeService::DynamicColorDef {
             .key = "Test/MyColor",
-            .lightValue = QColor(255, 0, 0),
-            .darkValue = QColor(0, 0, 255),
+            .value = QColor(255, 0, 0),
         },
     };
     theme.RegisterDynamicTokens(defs);
 
-    const auto color = theme.DynamicColor("Test/MyColor");
+    auto color = theme.DynamicColor("Test/MyColor");
     REQUIRE(color.has_value());
     CHECK(*color == QColor(255, 0, 0));
     CHECK_FALSE(theme.HasToken(TokenKind::Color, "Test/MyColor"));
+
+    const std::array themeDefs = {
+        IThemeService::DynamicThemeColorDef {
+            .key = "Test/MyColor",
+            .themeName = "Dark",
+            .value = QColor(0, 0, 255),
+        },
+    };
+    theme.RegisterDynamicThemeColors(themeDefs);
+
+    theme.SetTheme(kThemeDark);
+    color = theme.DynamicColor("Test/MyColor");
+    REQUIRE(color.has_value());
+    CHECK(*color == QColor(0, 0, 255));
+
+    theme.SetTheme(kThemeHighContrast);
+    color = theme.DynamicColor("Test/MyColor");
+    REQUIRE(color.has_value());
+    CHECK(*color == QColor(255, 0, 0));
+
+    std::array<std::string_view, 1> keys = {"Test/MyColor"};
+    theme.UnregisterDynamicTokens(keys);
+    CHECK_FALSE(theme.DynamicColor("Test/MyColor").has_value());
+}
+
+TEST_CASE("kThemeLight and kThemeDark are built-in theme name constants only") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    theme.SetTheme(kThemeLight);
+    REQUIRE(theme.CurrentTheme() == kThemeLight);
+    const auto lightPrimary = theme.Color("colorPrimary");
+    REQUIRE(lightPrimary.has_value());
+
+    theme.SetTheme(kThemeDark);
+    REQUIRE(theme.CurrentTheme() == kThemeDark);
+    const auto darkPrimary = theme.Color("colorPrimary");
+    REQUIRE(darkPrimary.has_value());
+
+    CHECK(kThemeLight == QStringLiteral("Light"));
+    CHECK(kThemeDark == QStringLiteral("Dark"));
+    CHECK(*lightPrimary == *darkPrimary);
 }
 
 } // TEST_SUITE

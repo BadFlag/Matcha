@@ -452,8 +452,13 @@ namespace matcha::gui {
      */
     struct DynamicColorDef {
       std::string_view key;  ///< 唯一键，例如 "FEA/MeshQualityBad"
-      QColor lightValue;     ///< Light 主题下的颜色值
-      QColor darkValue;      ///< Dark 主题下的颜色值
+      QColor value;          ///< Runtime extension value, independent from ThemeMode.
+    };
+
+    struct DynamicThemeColorDef {
+      std::string_view key;
+      std::string_view themeName;
+      QColor value;
     };
 
     /**
@@ -479,6 +484,8 @@ namespace matcha::gui {
      * @param defs 动态颜色定义列表的 span。
      */
     virtual void RegisterDynamicTokens(std::span<const DynamicColorDef> defs) = 0;
+
+    virtual void RegisterDynamicThemeColors(std::span<const DynamicThemeColorDef> defs) = 0;
 
     /**
      * @brief 从插件注册动态字体 Token。

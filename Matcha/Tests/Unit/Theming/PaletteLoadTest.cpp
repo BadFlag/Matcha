@@ -162,8 +162,7 @@ TEST_CASE("Dynamic token register, query, unregister") {
     std::array defs = {
         IThemeService::DynamicColorDef {
             .key = "Test/MyColor",
-            .lightValue = QColor(255, 0, 0),
-            .darkValue = QColor(0, 0, 255),
+            .value = QColor(255, 0, 0),
         },
     };
     theme.RegisterDynamicTokens(defs);
@@ -173,11 +172,11 @@ TEST_CASE("Dynamic token register, query, unregister") {
     REQUIRE(result.has_value());
     CHECK(result->red() == 255);
 
-    // Switch to Dark
+    // Switch to Dark; dynamic single value is unchanged.
     theme.SetTheme(kThemeDark);
     result = theme.DynamicColor("Test/MyColor");
     REQUIRE(result.has_value());
-    CHECK(result->blue() == 255);
+    CHECK(result->red() == 255);
 
     // Unregister
     std::array<std::string_view, 1> keys = {"Test/MyColor"};

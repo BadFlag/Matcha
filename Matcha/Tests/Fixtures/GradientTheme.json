@@ -1,0 +1,10 @@
+{
+  "name": "GradientFixture",
+  "colors": {
+    "colorPrimary": "#0066FF",
+    "colorPrimaryGradient": "#000000|#808080|#FFFFFF",
+    "colorSuccessGradient": "#111111|#222222",
+    "colorWarningGradient": "#123456",
+    "colorErrorGradient": "#123456|not-a-color"
+  }
+}

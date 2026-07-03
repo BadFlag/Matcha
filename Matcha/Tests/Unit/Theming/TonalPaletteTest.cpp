@@ -317,8 +317,7 @@ TEST_CASE("UnregisterDynamicTokens removes all types with same key") {
     std::array colorDefs = {
         IThemeService::DynamicColorDef {
             .key = "Test/Multi",
-            .lightValue = QColor(255, 0, 0),
-            .darkValue = QColor(0, 0, 255),
+            .value = QColor(255, 0, 0),
         },
     };
     FontSpec fs;

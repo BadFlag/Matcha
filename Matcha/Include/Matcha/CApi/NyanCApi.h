@@ -349,9 +349,9 @@ NYAN_API NyanErrorCode NyanTheme_CurrentName(NyanAppHandle app,
 /**
  * @brief Register a custom theme.
  * @param app      Application handle. [borrow]
- * @param name     Unique theme name (UTF-8). [borrow]
+ * @param name     Migration-only parameter. Ignored; the JSON root "name" is authoritative.
  * @param jsonPath Absolute path to palette JSON file (UTF-8). [borrow]
- * @param isDark   Non-zero if the theme belongs to the Dark family.
+ * @param isDark   Migration-only parameter. Ignored; themes are not classified as Light/Dark.
  */
 NYAN_API NyanErrorCode NyanTheme_Register(NyanAppHandle app,
                                           const char* name,

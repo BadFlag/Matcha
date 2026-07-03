@@ -1,0 +1,15 @@
+{
+  "name": "InvalidShadow",
+  "colors": {
+    "colorPrimary": "#ABCDEF"
+  },
+  "shadows": {
+    "shadowSM": [
+      {
+        "orientation": [0, 1],
+        "blur": 2,
+        "color": [0, 10, 26, 40]
+      }
+    ]
+  }
+}

@@ -214,8 +214,7 @@ private slots: // NOLINT(readability-redundant-access-specifiers)
         std::array defs = {
             IThemeService::DynamicColorDef {
                 .key = "Test/Widget",
-                .lightValue = QColor(10, 20, 30),
-                .darkValue = QColor(30, 20, 10),
+                .value = QColor(10, 20, 30),
             },
         };
         theme.RegisterDynamicTokens(defs);
@@ -224,11 +223,11 @@ private slots: // NOLINT(readability-redundant-access-specifiers)
         QVERIFY(result.has_value());
         QCOMPARE(result->red(), 10);
 
-        // Switch theme -- dark value returned
+        // Switch theme -- dynamic single value is unchanged
         theme.SetTheme(kThemeDark);
         result = theme.DynamicColor("Test/Widget");
         QVERIFY(result.has_value());
-        QCOMPARE(result->red(), 30);
+        QCOMPARE(result->red(), 10);
     }
 
     // -- S5: Dynamic token unregister --
@@ -241,8 +240,7 @@ private slots: // NOLINT(readability-redundant-access-specifiers)
         std::array defs = {
             IThemeService::DynamicColorDef {
                 .key = "Test/Remove",
-                .lightValue = QColor(1, 2, 3),
-                .darkValue = QColor(3, 2, 1),
+                .value = QColor(1, 2, 3),
             },
         };
         theme.RegisterDynamicTokens(defs);
