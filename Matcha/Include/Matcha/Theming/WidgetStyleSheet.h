@@ -15,7 +15,9 @@
 #include <Matcha/Theming/DesignTokens.h>
 
 #include <cstdint>
+#include <optional>
 #include <span>
+#include <string>
 
 namespace matcha::gui {
 
@@ -178,6 +180,14 @@ inline constexpr auto kWidgetKindCount = static_cast<std::size_t>(WidgetKind::Co
 
     /// @brief 变体颜色映射（非拥有视图，指向 NyanTheme 存储区）
     std::span<const VariantStyle> variants;
+
+    std::optional<std::string> radiusKey;
+    std::optional<std::string> paddingHKey;
+    std::optional<std::string> paddingVKey;
+    std::optional<std::string> gapKey;
+    std::optional<std::string> minHeightKey;
+    std::optional<std::string> fontKey;
+    std::optional<std::string> shadowKey;
   };
 
 } // namespace matcha::gui

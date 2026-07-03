@@ -30,6 +30,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "Matcha/Theming/NyanTheme.h"
 #include "Matcha/Theming/Palette/ContrastChecker.h"
@@ -287,6 +288,143 @@ namespace matcha::gui {
       };
     }
 
+    [[nodiscard]] auto ScaledPx(int basePx, float scale) -> int {
+      return static_cast<int>(std::lroundf(static_cast<float>(basePx) * scale));
+    }
+
+    [[nodiscard]] auto ResolveColorValue(
+        const NyanTheme& theme, const std::optional<std::string>& key, ColorToken fallback
+    ) -> QColor {
+      if (key) {
+        if (const auto color = theme.Color(*key)) {
+          return *color;
+        }
+      }
+      return theme.Color(fallback);
+    }
+
+    [[nodiscard]] auto ResolveSpacingValue(
+        const NyanTheme& theme, const std::optional<std::string>& key, SpaceToken fallback
+    ) -> int {
+      if (key) {
+        if (const auto dimension = theme.DimensionPx(*key)) {
+          return ScaledPx(*dimension, theme.CurrentDensityScale());
+        }
+      }
+      return theme.SpacingPx(fallback);
+    }
+
+    [[nodiscard]] auto ResolveRadiusValue(
+        const NyanTheme& theme, const std::optional<std::string>& key, RadiusToken fallback
+    ) -> int {
+      if (key) {
+        if (const auto dimension = theme.DimensionPx(*key)) {
+          return ScaledPx(*dimension, theme.CurrentDensityScale());
+        }
+      }
+      return ScaledPx(theme.Radius(fallback), theme.CurrentDensityScale());
+    }
+
+    [[nodiscard]] auto ResolveMinHeightValue(
+        const NyanTheme& theme, const std::optional<std::string>& key, SizeToken fallback
+    ) -> int {
+      if (key) {
+        if (const auto dimension = theme.DimensionPx(*key)) {
+          return ScaledPx(*dimension, theme.CurrentDensityScale());
+        }
+      }
+      return ScaledPx(fw::ToPixels(fallback), theme.CurrentDensityScale());
+    }
+
+    [[nodiscard]] auto ResolveFontValue(
+        const NyanTheme& theme, const std::optional<std::string>& key, FontRole fallback
+    ) -> FontSpec {
+      if (key) {
+        if (const auto spec = theme.Font(*key)) {
+          return *spec;
+        }
+      }
+      return theme.Font(fallback);
+    }
+
+    [[nodiscard]] auto ScaleShadowLayer(const ShadowLayerSpec& layer, float scale) -> ShadowLayerSpec {
+      return ShadowLayerSpec{
+          .offsetX = ScaledPx(layer.offsetX, scale),
+          .offsetY = ScaledPx(layer.offsetY, scale),
+          .blurRadius = ScaledPx(layer.blurRadius, scale),
+          .spread = ScaledPx(layer.spread, scale),
+          .color = layer.color,
+      };
+    }
+
+    [[nodiscard]] auto ResolveShadowLayers(
+        const NyanTheme& theme, const std::optional<std::string>& key, ShadowToken fallback
+    ) -> std::vector<ShadowLayerSpec> {
+      std::vector<ShadowLayerSpec> result;
+      const float scale = theme.CurrentDensityScale();
+      if (key) {
+        if (const auto layers = theme.Shadow(*key)) {
+          result.reserve(layers->size());
+          for (const auto& layer : *layers) {
+            result.push_back(ScaleShadowLayer(layer, scale));
+          }
+          return result;
+        }
+      }
+
+      const auto& legacy = theme.Shadow(fallback);
+      if (legacy.blurRadius > 0 || legacy.offsetX != 0 || legacy.offsetY != 0 || legacy.opacity > 0.0) {
+        QColor color(0, 0, 0);
+        color.setAlphaF(std::clamp(static_cast<double>(legacy.opacity), 0.0, 1.0));
+        result.push_back(ShadowLayerSpec{
+            .offsetX = ScaledPx(legacy.offsetX, scale),
+            .offsetY = ScaledPx(legacy.offsetY, scale),
+            .blurRadius = ScaledPx(legacy.blurRadius, scale),
+            .spread = 0,
+            .color = color,
+        });
+      }
+      return result;
+    }
+
+    void BindStateStyleKeys(VariantStyle& variant) {
+      for (auto& state : variant.colors) {
+        if (const auto key = LegacyColorTokenKey(state.background)) {
+          state.backgroundKey = std::string{*key};
+        }
+        if (const auto key = LegacyColorTokenKey(state.foreground)) {
+          state.foregroundKey = std::string{*key};
+        }
+        if (const auto key = LegacyColorTokenKey(state.border)) {
+          state.borderKey = std::string{*key};
+        }
+        if (const auto key = LegacySpaceTokenKey(state.borderWidth)) {
+          state.borderWidthKey = std::string{*key};
+        }
+      }
+    }
+
+    void BindWidgetStyleKeys(WidgetStyleSheet& sheet) {
+      if (const auto key = LegacyRadiusTokenKey(sheet.radius)) {
+        sheet.radiusKey = std::string{*key};
+      }
+      if (const auto key = LegacySpaceTokenKey(sheet.paddingH)) {
+        sheet.paddingHKey = std::string{*key};
+      }
+      if (const auto key = LegacySpaceTokenKey(sheet.paddingV)) {
+        sheet.paddingVKey = std::string{*key};
+      }
+      if (const auto key = LegacySpaceTokenKey(sheet.gap)) {
+        sheet.gapKey = std::string{*key};
+      }
+      if (const auto key = LegacyFontRoleKey(sheet.font)) {
+        sheet.fontKey = std::string{*key};
+      }
+      if (const auto key = LegacyShadowTokenKey(sheet.elevation)) {
+        sheet.shadowKey = std::string{*key};
+      }
+    }
+
     [[nodiscard]] auto ParsePipeGradientToken(QString value, std::string_view key) -> std::optional<GradientSpec> {
       const auto stops = value.split(u'|', Qt::SkipEmptyParts);
       if (stops.size() < 2) {
@@ -350,9 +488,7 @@ namespace matcha::gui {
     if (!TryLoadPalette(name)) {
       return;
     }
-    /*
-    BuildFonts();
-    BuildShadows();
+
     BuildStyleSheets();
     ApplyComponentOverrides();
     InvalidateIconCache();
@@ -374,8 +510,7 @@ namespace matcha::gui {
       }
     }
 #endif
-
-    BuildGlobalStyleSheet();*/
+    BuildGlobalStyleSheet();
 
     _currentTheme = name;
     emit ThemeChanged(_currentTheme);
@@ -948,6 +1083,10 @@ namespace matcha::gui {
       danger.colors[std::to_underlying(InteractionState::Error)]
           = {ColorToken::colorError, ColorToken::OnAccent, ColorToken::colorError};
 
+      BindStateStyleKeys(primary);
+      BindStateStyleKeys(secondary);
+      BindStateStyleKeys(ghost);
+      BindStateStyleKeys(danger);
       _variantStorage[idx] = {primary, secondary, ghost, danger};
     }
 
@@ -989,6 +1128,9 @@ namespace matcha::gui {
       partial.colors[std::to_underlying(InteractionState::Focused)]
           = {ColorToken::colorBgContainerTertiary, ColorToken::colorPrimaryActive, ColorToken::Focus};
 
+      BindStateStyleKeys(unchecked);
+      BindStateStyleKeys(checked);
+      BindStateStyleKeys(partial);
       _variantStorage[idx] = {unchecked, checked, partial};
     }
 
@@ -1014,6 +1156,8 @@ namespace matcha::gui {
       checked.colors[std::to_underlying(InteractionState::Focused)]
           = {ColorToken::colorPrimary, ColorToken::OnAccent, ColorToken::Focus};
 
+      BindStateStyleKeys(unchecked);
+      BindStateStyleKeys(checked);
       _variantStorage[idx] = {unchecked, checked};
     }
 
@@ -1040,6 +1184,8 @@ namespace matcha::gui {
       on.colors[std::to_underlying(InteractionState::Disabled)]
           = {ColorToken::colorPrimaryBorder, ColorToken::colorTextQuaternary, ColorToken::colorPrimaryBorder, 0.45F};
 
+      BindStateStyleKeys(off);
+      BindStateStyleKeys(on);
       _variantStorage[idx] = {off, on};
     }
 
@@ -1069,6 +1215,8 @@ namespace matcha::gui {
       active.colors[std::to_underlying(InteractionState::Focused)]
           = {ColorToken::colorPrimaryBg, ColorToken::colorPrimary, ColorToken::Focus};
 
+      BindStateStyleKeys(def);
+      BindStateStyleKeys(active);
       _variantStorage[idx] = {def, active};
     }
 
@@ -1257,6 +1405,18 @@ namespace matcha::gui {
     statusBar.paddingH = SpaceToken::marginXXXS;
     statusBar.paddingV = SpaceToken::marginXXXS;
     statusBar.font = FontRole::fontSizeSM;
+
+    auto& pushButton = _styleSheets[std::to_underlying(WidgetKind::PushButton)];
+    BindWidgetStyleKeys(pushButton);
+    pushButton.minHeightKey = "controlHeightMD";
+
+    BindWidgetStyleKeys(toolButton);
+    BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::CheckBox)]);
+    BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::RadioButton)]);
+    BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::Toggle)]);
+
+    BindWidgetStyleKeys(tooltip);
+    BindWidgetStyleKeys(popConfirm);
   }
 
   // ============================================================================
@@ -1285,6 +1445,27 @@ namespace matcha::gui {
       // 动画
       if (ov.transition) {
         sheet.transition = *ov.transition;
+      }
+      if (ov.radiusKey) {
+        sheet.radiusKey = *ov.radiusKey;
+      }
+      if (ov.paddingHKey) {
+        sheet.paddingHKey = *ov.paddingHKey;
+      }
+      if (ov.paddingVKey) {
+        sheet.paddingVKey = *ov.paddingVKey;
+      }
+      if (ov.gapKey) {
+        sheet.gapKey = *ov.gapKey;
+      }
+      if (ov.minHeightKey) {
+        sheet.minHeightKey = *ov.minHeightKey;
+      }
+      if (ov.fontKey) {
+        sheet.fontKey = *ov.fontKey;
+      }
+      if (ov.shadowKey) {
+        sheet.shadowKey = *ov.shadowKey;
       }
     }
   }
@@ -1573,8 +1754,6 @@ namespace matcha::gui {
 
   auto NyanTheme::Resolve(WidgetKind kind, std::size_t variantIndex, InteractionState state) const -> ResolvedStyle {
     const auto& sheet = ResolveStyleSheet(kind);
-    const float scale = CurrentDensityScale();
-
     // Resolve colors from variant/state matrix
     StateStyle ss;  // default if out of range
     if (!sheet.variants.empty()) {
@@ -1586,7 +1765,7 @@ namespace matcha::gui {
     }
 
     // Build resolved font with letterSpacing applied
-    const auto& fontSpec = Font(sheet.font);
+    const auto fontSpec = ResolveFontValue(*this, sheet.fontKey, sheet.font);
     QFont resolvedFont(fontSpec.family, fontSpec.sizeInPt, fontSpec.weight, fontSpec.italic);
     if (fontSpec.letterSpacing != 0.0) {
       resolvedFont.setLetterSpacing(QFont::AbsoluteSpacing, fontSpec.letterSpacing);
@@ -1599,26 +1778,26 @@ namespace matcha::gui {
 
     // Resolve easing
     const int easingType = Easing(sheet.transition.easing);
+    auto shadowLayers = ResolveShadowLayers(*this, sheet.shadowKey, sheet.elevation);
+    ShadowSpec shadow{};
+    if (!shadowLayers.empty()) {
+      shadow = LegacyShadowFromLayer(shadowLayers.front());
+    }
 
     return ResolvedStyle{
-      .background = Color(ss.background),
-      .foreground = Color(ss.foreground),
-      .border = Color(ss.border),
-      .radiusPx = static_cast<int>(std::lroundf(static_cast<float>(Radius(sheet.radius)) * scale)),
-      .paddingHPx = SpacingPx(sheet.paddingH),
-      .paddingVPx = SpacingPx(sheet.paddingV),
-      .gapPx = SpacingPx(sheet.gap),
-      .minHeightPx = static_cast<int>(static_cast<float>(fw::ToPixels(sheet.minHeight)) * scale),
-      .borderWidthPx = SpacingPx(ss.borderWidth),
+      .background = ResolveColorValue(*this, ss.backgroundKey, ss.background),
+      .foreground = ResolveColorValue(*this, ss.foregroundKey, ss.foreground),
+      .border = ResolveColorValue(*this, ss.borderKey, ss.border),
+      .radiusPx = ResolveRadiusValue(*this, sheet.radiusKey, sheet.radius),
+      .paddingHPx = ResolveSpacingValue(*this, sheet.paddingHKey, sheet.paddingH),
+      .paddingVPx = ResolveSpacingValue(*this, sheet.paddingVKey, sheet.paddingV),
+      .gapPx = ResolveSpacingValue(*this, sheet.gapKey, sheet.gap),
+      .minHeightPx = ResolveMinHeightValue(*this, sheet.minHeightKey, sheet.minHeight),
+      .borderWidthPx = ResolveSpacingValue(*this, ss.borderWidthKey, ss.borderWidth),
       .font = resolvedFont,
       .lineHeightPx = lineHeightPx,
-      .shadow =
-          [&]() {
-            auto s = Shadow(sheet.elevation);
-            s.offsetY = static_cast<int>(std::lroundf(static_cast<float>(s.offsetY) * scale));
-            s.blurRadius = static_cast<int>(std::lroundf(static_cast<float>(s.blurRadius) * scale));
-            return s;
-          }(),
+      .shadow = shadow,
+      .shadowLayers = std::move(shadowLayers),
       .opacity = ss.opacity,
       .durationMs = AnimationMs(sheet.transition.duration),
       .easingType = easingType,
@@ -1835,36 +2014,15 @@ namespace matcha::gui {
     const auto& bodyFont = Font(FontRole::fontSizeSM);
     const auto& captionFont = Font(FontRole::fontSizeMD);
 
-    // Build one large stylesheet string from Design Tokens
+    // Legacy/native Qt adapter only. Matcha self-painted widgets consume
+    // ResolvedStyle from paintEvent and must not rely on global QSS for the
+    // same visual properties.
     QString qss;
     qss.reserve(8192);
 
     // -- QWidget base --
     qss += QStringLiteral("QWidget { font-family: '%1'; font-size: %2pt; color: %3; }\n")
                .arg(bodyFont.family, QString::number(bodyFont.sizeInPt), c(ColorToken::colorText));
-
-    // -- QPushButton --
-    qss += QStringLiteral(
-               "QPushButton {"
-               "  background-color: %1; color: %2; border: 1px solid %3;"
-               "  border-radius: %4px; padding: 4px 12px;"
-               "}\n"
-               "QPushButton:hover {"
-               "  background-color: %5; border-color: %6;"
-               "}\n"
-               "QPushButton:pressed {"
-               "  background-color: %7;"
-               "}\n"
-               "QPushButton:disabled {"
-               "  background-color: %8; color: %9; border-color: %10;"
-               "}\n"
-    )
-               .arg(
-                   c(ColorToken::colorFill), c(ColorToken::colorText), c(ColorToken::colorBorder),
-                   QString::number(radius), c(ColorToken::colorFillHover), c(ColorToken::colorBorderSecondary),
-                   c(ColorToken::colorFillTertiaryHover), c(ColorToken::colorFillSecondary),
-                   c(ColorToken::colorTextQuaternary), c(ColorToken::colorDivider)
-               );
 
     // -- QLineEdit --
     qss += QStringLiteral(
@@ -2210,21 +2368,6 @@ namespace matcha::gui {
 
     // -- QLabel (just inherits base font/color; no border/bg) --
     qss += QStringLiteral("QLabel { background: transparent; }\n");
-
-    // -- QToolButton --
-    qss += QStringLiteral(
-               "QToolButton {"
-               "  background: transparent; color: %1; border: none;"
-               "  border-radius: %2px; padding: 3px;"
-               "}\n"
-               "QToolButton:hover { background: %3; }\n"
-               "QToolButton:pressed { background: %4; }\n"
-               "QToolButton:disabled { color: %5; }\n"
-    )
-               .arg(
-                   c(ColorToken::colorText), QString::number(radius), c(ColorToken::colorFillHover),
-                   c(ColorToken::colorFillTertiaryHover), c(ColorToken::colorTextQuaternary)
-               );
 
     // -- QDialog --
     qss += QStringLiteral("QDialog { background: %1; }\n").arg(c(ColorToken::colorBgContainerSecondary));

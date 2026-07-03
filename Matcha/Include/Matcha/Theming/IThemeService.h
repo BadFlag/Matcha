@@ -36,6 +36,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -74,14 +75,6 @@ namespace matcha::gui {
 
   struct GradientSpec {
     std::vector<GradientStop> stops;
-  };
-
-  struct ShadowLayerSpec {
-    int offsetX = 0;
-    int offsetY = 0;
-    int blurRadius = 0;
-    int spread = 0;
-    QColor color;
   };
 
   // ============================================================================
@@ -428,6 +421,13 @@ namespace matcha::gui {
       std::optional<FontRole> font;             // 字体角色
       std::optional<ShadowToken> elevation;     // 阴影深度
       std::optional<TransitionDef> transition;  // 动画持续时间和缓动曲线
+      std::optional<std::string> radiusKey;
+      std::optional<std::string> paddingHKey;
+      std::optional<std::string> paddingVKey;
+      std::optional<std::string> gapKey;
+      std::optional<std::string> minHeightKey;
+      std::optional<std::string> fontKey;
+      std::optional<std::string> shadowKey;
     };
 
     /**

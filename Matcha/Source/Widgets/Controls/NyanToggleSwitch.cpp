@@ -9,6 +9,7 @@
 
 #include <QMouseEvent>
 #include <QPainter>
+#include <QFontMetrics>
 #include <QVariantAnimation>
 
 namespace matcha::gui {
@@ -130,12 +131,15 @@ auto NyanToggleSwitch::sizeHint() const -> QSize
 {
     int w = kTrackWidth;
     if (!_onText.isEmpty() || !_offText.isEmpty()) {
-        const auto& fontSpec = Theme().Font(StyleSheet().font);
-        QFont f(fontSpec.family, fontSpec.sizeInPt, fontSpec.weight, fontSpec.italic);
-        QFontMetrics fm(f);
+        const auto style = Theme().Resolve(
+            WidgetKind::Toggle,
+            _checked ? 1U : 0U,
+            isEnabled() ? InteractionState::Normal : InteractionState::Disabled
+        );
+        QFontMetrics fm(style.font);
         const int textW = std::max(fm.horizontalAdvance(_onText),
                                    fm.horizontalAdvance(_offText));
-        w += kTextGap + textW;
+        w += style.gapPx + textW;
     }
     return {w, kTrackHeight + 4}; // 4px vertical breathing room
 }

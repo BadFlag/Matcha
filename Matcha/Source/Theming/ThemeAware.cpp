@@ -40,7 +40,9 @@ void ThemeAware::PaintFocusRing(QWidget* widget, const IThemeService& theme,
     QPainter p(widget);
     p.setRenderHint(QPainter::Antialiasing);
 
-    QColor ringColor = theme.Color(ColorToken::Focus);
+    QColor ringColor = theme.Color("Focus").value_or(
+        theme.Resolve(WidgetKind::PushButton, 0, InteractionState::Focused).border
+    );
     ringColor.setAlpha(200);
 
     constexpr int kRingWidth  = 2;

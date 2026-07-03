@@ -468,6 +468,174 @@ TEST_CASE("SetTheme refreshes shadow store between themes") {
     CHECK(shadow->front().offsetY == 1);
 }
 
+TEST_CASE("ResolvedStyle prefers key fields over legacy enum fields") {
+    matcha::test::QtAppGuard::Ensure();
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+
+    IThemeService::ComponentOverride override {};
+    override.kind = WidgetKind::PushButton;
+    override.radius = RadiusToken::borderRadiusLG;
+    override.paddingH = SpaceToken::marginXXS;
+    override.font = FontRole::fontSizeLG;
+    override.elevation = ShadowToken::boxShadowSecondary;
+    override.radiusKey = "radiusSmall";
+    override.paddingHKey = "spaceSM";
+    override.fontKey = "fontXS";
+    override.shadowKey = "shadowSM";
+    const std::array overrides = {override};
+    theme.RegisterComponentOverrides(overrides);
+
+    RegisterAndLoadFixture(
+        theme,
+        QStringLiteral("Stage7StyleTheme.json"),
+        QStringLiteral("Stage7Style")
+    );
+
+    const auto style = theme.Resolve(WidgetKind::PushButton, 0, InteractionState::Normal);
+    CHECK(style.radiusPx == 2);
+    CHECK(style.paddingHPx == 14);
+    CHECK(style.font.pointSize() == 9);
+    REQUIRE(style.shadowLayers.size() == 2);
+    CHECK(style.shadowLayers.front().offsetX == 3);
+    CHECK(style.shadowLayers.front().offsetY == 7);
+    CHECK(style.shadow.offsetX == 3);
+    CHECK(style.shadow.offsetY == 7);
+    CHECK(style.shadow.blurRadius == 11);
+    CHECK(style.shadow.opacity == doctest::Approx(128.0 / 255.0));
+}
+
+TEST_CASE("ResolvedStyle missing keys fall back without polluting token store") {
+    matcha::test::QtAppGuard::Ensure();
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+
+    IThemeService::ComponentOverride override {};
+    override.kind = WidgetKind::Panel;
+    override.radius = RadiusToken::borderRadiusLG;
+    override.font = FontRole::fontSizeLG;
+    override.elevation = ShadowToken::boxShadowSecondary;
+    override.radiusKey = "missingRadius";
+    override.fontKey = "missingFont";
+    override.shadowKey = "missingShadow";
+    const std::array overrides = {override};
+    theme.RegisterComponentOverrides(overrides);
+
+    RegisterAndLoadLight(theme);
+
+    CHECK_FALSE(theme.HasToken(TokenKind::Dimension, "missingRadius"));
+    CHECK_FALSE(theme.HasToken(TokenKind::Font, "missingFont"));
+    CHECK_FALSE(theme.HasToken(TokenKind::Shadow, "missingShadow"));
+
+    const auto style = theme.Resolve(WidgetKind::Panel, 0, InteractionState::Normal);
+    CHECK(style.radiusPx == theme.Radius(RadiusToken::borderRadiusLG));
+    CHECK(style.font.pointSize() == theme.Font(FontRole::fontSizeLG).sizeInPt);
+    REQUIRE(style.shadowLayers.size() == 1);
+    CHECK(style.shadowLayers.front().offsetY == 3);
+
+    CHECK_FALSE(theme.HasToken(TokenKind::Dimension, "missingRadius"));
+    CHECK_FALSE(theme.HasToken(TokenKind::Font, "missingFont"));
+    CHECK_FALSE(theme.HasToken(TokenKind::Shadow, "missingShadow"));
+}
+
+TEST_CASE("PushButton representative path uses key fields as primary style input") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    const auto& sheet = theme.ResolveStyleSheet(WidgetKind::PushButton);
+    REQUIRE(sheet.fontKey.has_value());
+    CHECK(*sheet.fontKey == "fontSM");
+    REQUIRE(sheet.radiusKey.has_value());
+    CHECK(*sheet.radiusKey == "radiusDefault");
+    REQUIRE(sheet.minHeightKey.has_value());
+    CHECK(*sheet.minHeightKey == "controlHeightMD");
+
+    REQUIRE_FALSE(sheet.variants.empty());
+    const auto& normal = sheet.variants[0].colors[std::to_underlying(InteractionState::Normal)];
+    REQUIRE(normal.backgroundKey.has_value());
+    CHECK(*normal.backgroundKey == "colorPrimary");
+    REQUIRE(normal.foregroundKey.has_value());
+    CHECK(*normal.foregroundKey == "OnAccent");
+    REQUIRE(normal.borderKey.has_value());
+    CHECK(*normal.borderKey == "colorPrimary");
+}
+
+TEST_CASE("Low risk self-painted controls expose key driven style fields") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    const std::array kinds = {
+        WidgetKind::ToolButton,
+        WidgetKind::CheckBox,
+        WidgetKind::RadioButton,
+        WidgetKind::Toggle,
+    };
+
+    for (const auto kind : kinds) {
+        const auto& sheet = theme.ResolveStyleSheet(kind);
+
+        REQUIRE(sheet.fontKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Font, *sheet.fontKey));
+        REQUIRE(sheet.gapKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Dimension, *sheet.gapKey));
+        REQUIRE(sheet.radiusKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Dimension, *sheet.radiusKey));
+
+        REQUIRE_FALSE(sheet.variants.empty());
+        const auto& normal = sheet.variants[0].colors[std::to_underlying(InteractionState::Normal)];
+        REQUIRE(normal.backgroundKey.has_value());
+        REQUIRE(normal.foregroundKey.has_value());
+        REQUIRE(normal.borderKey.has_value());
+
+        const auto style = theme.Resolve(kind, 0, InteractionState::Normal);
+        const auto background = theme.Color(*normal.backgroundKey);
+        const auto foreground = theme.Color(*normal.foregroundKey);
+        const auto border = theme.Color(*normal.borderKey);
+        const auto gap = theme.DimensionPx(*sheet.gapKey);
+        const auto radius = theme.DimensionPx(*sheet.radiusKey);
+        const auto font = theme.Font(*sheet.fontKey);
+        REQUIRE(background.has_value());
+        REQUIRE(foreground.has_value());
+        REQUIRE(border.has_value());
+        REQUIRE(gap.has_value());
+        REQUIRE(radius.has_value());
+        REQUIRE(font.has_value());
+        CHECK(style.background == *background);
+        CHECK(style.foreground == *foreground);
+        CHECK(style.border == *border);
+        CHECK(style.gapPx == *gap);
+        CHECK(style.radiusPx == *radius);
+        CHECK(style.font.pointSize() == font->sizeInPt);
+    }
+}
+
+TEST_CASE("Focus ring color resolves through key path or ResolvedStyle fallback") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    const auto focus = theme.Color("Focus").value_or(
+        theme.Resolve(WidgetKind::PushButton, 0, InteractionState::Focused).border
+    );
+    CHECK(focus.isValid());
+}
+
+TEST_CASE("Theme switching refreshes key driven ResolvedStyle") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    auto style = theme.Resolve(WidgetKind::PushButton, 0, InteractionState::Normal);
+    CHECK(style.background == QColor::fromString(QStringLiteral("#0066FF")));
+    CHECK(style.font.pointSize() == 12);
+
+    REQUIRE(theme.RegisterTheme(QStringLiteral(MATCHA_TEST_FIXTURE_DIR "/Stage7StyleTheme.json")));
+    theme.SetTheme(QStringLiteral("Stage7Style"));
+    REQUIRE(theme.CurrentTheme() == QStringLiteral("Stage7Style"));
+
+    style = theme.Resolve(WidgetKind::PushButton, 0, InteractionState::Normal);
+    CHECK(style.background == QColor::fromString(QStringLiteral("#112233")));
+    CHECK(style.foreground == QColor::fromString(QStringLiteral("#ABCDEF")));
+    CHECK(style.font.pointSize() == 13);
+    CHECK(style.radiusPx == 4);
+}
+
 TEST_CASE("Invalid shadow layer fields fail load without polluting current theme") {
     NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
     RegisterAndLoadLight(theme);

@@ -12,7 +12,7 @@
  * No old NyanGuis equivalent exists. This is a new widget.
  *
  * @see ThemeAware for mixin lifecycle.
- * @see DesignTokens.h for ColorToken and AnimationToken.
+ * @see ThemeAware for key-driven token resolution.
  */
 
 #include <Matcha/Core/Macros.h>
@@ -87,7 +87,6 @@ private:
     static constexpr int kTrackHeight = 18; ///< Track height in px
     static constexpr int kKnobSize    = 14; ///< Knob diameter in px
     static constexpr int kKnobMargin  = 2;  ///< Knob inset from track edge
-    static constexpr int kTextGap     = 6;  ///< Gap between track and text
 
     bool    _checked = false;   ///< Current on/off state
     qreal   _knobPos = 0.0;    ///< Animated knob X position (0.0=left, 1.0=right)

@@ -15,10 +15,13 @@
  * @see COCAUI_Design_System_Specification.md 第 2-4 章详细 Token 定义
  */
 
+#include <QColor>
 #include <QString>
 #include <QtTypes>
 #include <array>
 #include <cstdint>
+#include <optional>
+#include <string>
 #include <utility>
 
 #include "Matcha/Theming/Token/TokenEnums.h"
@@ -241,6 +244,14 @@ namespace matcha::gui {
     qreal opacity = 0.0;  ///< 阴影颜色相对于背景色的不透明度
   };
 
+  struct ShadowLayerSpec {
+    int offsetX = 0;
+    int offsetY = 0;
+    int blurRadius = 0;
+    int spread = 0;
+    QColor color;
+  };
+
   // 动画 Token 已在 matcha::fw::TokenEnums.h 中定义
 
   // ============================================================================
@@ -262,6 +273,11 @@ namespace matcha::gui {
     float opacity = 1.0F;                            ///< 0.0~1.0，作用于整个 Widget
     SpaceToken borderWidth = SpaceToken::marginXXS;  ///< 边框描边宽度（默认 1px）
     CursorToken cursor = CursorToken::Default;       ///< 光标形状（默认）
+
+    std::optional<std::string> backgroundKey;
+    std::optional<std::string> foregroundKey;
+    std::optional<std::string> borderKey;
+    std::optional<std::string> borderWidthKey;
   };
 
   /**

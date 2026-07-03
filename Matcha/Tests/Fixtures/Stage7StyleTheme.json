@@ -1,0 +1,60 @@
+{
+  "name": "Stage7Style",
+  "colors": {
+    "colorPrimary": "#112233",
+    "OnAccent": "#ABCDEF",
+    "colorPrimaryBgHover": "#223344",
+    "colorPrimaryActive": "#334455",
+    "Focus": "#445566"
+  },
+  "fonts": {
+    "fontXS": {
+      "family": "Stage7 Sans",
+      "size": 9,
+      "weight": 450,
+      "lineHeight": 1.25
+    },
+    "fontSM": {
+      "family": "Stage7 Sans",
+      "size": 13,
+      "weight": 500,
+      "lineHeight": 1.5
+    }
+  },
+  "space": {
+    "spaceXXS": 5,
+    "spaceSM": 14
+  },
+  "radius": {
+    "radiusSmall": 2,
+    "radiusDefault": 4,
+    "radiusLarge": 9
+  },
+  "controlHeight": {
+    "controlHeightMD": 38
+  },
+  "shadows": {
+    "shadowSM": [
+      {
+        "orientation": [3, 7],
+        "blur": 11,
+        "spread": 2,
+        "color": [10, 20, 30, 128]
+      },
+      {
+        "orientation": [0, 13],
+        "blur": 21,
+        "spread": 4,
+        "color": [40, 50, 60, 64]
+      }
+    ],
+    "shadowMS": [
+      {
+        "orientation": [1, 2],
+        "blur": 3,
+        "spread": 4,
+        "color": [70, 80, 90, 96]
+      }
+    ]
+  }
+}

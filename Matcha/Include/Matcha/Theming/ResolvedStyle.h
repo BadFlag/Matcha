@@ -17,6 +17,7 @@
 #include <QColor>
 #include <QFont>
 #include <optional>
+#include <vector>
 
 namespace matcha::gui {
 
@@ -62,6 +63,7 @@ namespace matcha::gui {
 
     // -- 解析后的视觉效果 --
     ShadowSpec shadow;     ///< 盒阴影参数
+    std::vector<ShadowLayerSpec> shadowLayers;
     float opacity = 1.0F;  ///< 控件不透明度（0.0..1.0）
 
     // -- 解析后的过渡动画 --
