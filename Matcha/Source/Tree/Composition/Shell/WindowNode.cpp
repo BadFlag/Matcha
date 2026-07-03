@@ -857,16 +857,17 @@ void WindowNode::BuildWindow(QWidget* parent)
 
     window->installEventFilter(new WindowCloseEventFilter(*this, window));
 
-    // Grid layout: Logo spans rows 0-1 col 0; TitleBar row 0 col 1;
-    //              DocToolBar row 1 col 1; Central row 2 col 0-1; StatusBar row 3 col 0-1
-    auto* container = new QWidget(window);
-    auto* grid = new QGridLayout(container);
-    grid->setContentsMargins(0, 0, 0, 0);
-    grid->setSpacing(0);
-
     static constexpr int kLogoColumnWidth = 64;
     static constexpr int kTitleBarHeight  = 28;
     static constexpr int kDocToolBarHeight = 36;
+
+    // Grid layout: Logo spans rows 0-1 col 0; TitleBar row 0 col 1;
+    //              DocToolBar row 1 col 1; Central row 2 col 0-1; StatusBar row 3 col 0-1
+    auto* container = new QWidget(window);
+    window->setCentralWidget(container);
+    auto* grid = new QGridLayout(container);
+    grid->setContentsMargins(0, 0, 0, 0);
+    grid->setSpacing(0);
 
     // -- LogoButtonNode (row 0-1, col 0) --
     auto logoNode = std::make_unique<LogoButtonNode>("logo-button");
@@ -874,6 +875,7 @@ void WindowNode::BuildWindow(QWidget* parent)
     grid->addWidget(logoWidget, 0, 0, 2, 1);
     grid->setColumnMinimumWidth(0, kLogoColumnWidth);
     AddNode(std::move(logoNode));
+
 
     // -- MainTitleBarNode (row 0, col 1) --
     auto titleBarNode = std::make_unique<MainTitleBarNode>("main-titlebar");
@@ -896,13 +898,29 @@ void WindowNode::BuildWindow(QWidget* parent)
         window->close();
     });
     AddNode(std::move(titleBarNode));
-
+    
     // -- DocumentToolBarNode (row 1, col 1) --
     auto docToolBarNode = std::make_unique<DocumentToolBarNode>("doc-toolbar");
     auto* docToolBarWidget = docToolBarNode->DocumentToolBar();
     grid->addWidget(docToolBarWidget, 1, 1);
     grid->setRowMinimumHeight(1, kDocToolBarHeight);
     AddNode(std::move(docToolBarNode));
+
+    grid->setRowStretch(2, 1);
+
+    _mainWindow = window;
+    return;
+
+
+    
+
+    
+
+    
+
+    
+
+    
 
     // -- Central area (row 2, col 0-1, stretch) --
     _centralArea = new QWidget(container);
@@ -946,10 +964,6 @@ void WindowNode::BuildWindow(QWidget* parent)
     auto statusBarNode = std::make_unique<StatusBarNode>();
     grid->addWidget(statusBarNode->StatusBar(), 3, 0, 1, 2);
     AddNode(std::move(statusBarNode));
-
-    window->setCentralWidget(container);
-
-    _mainWindow = window;
 }
 
 auto WindowNode::IsBuilt() const -> bool
