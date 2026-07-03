@@ -1015,6 +1015,7 @@ namespace matcha::gui {
       c[std::to_underlying(s)].cursor = fw::CursorToken::Pointer;
     }
 
+    BindStateStyleKeys(defaultVariant);
     _variantStorage[idx] = {defaultVariant};
 
     // PushButton: 4 variants (colorPrimary, Secondary, Ghost, Danger)
@@ -1141,6 +1142,8 @@ namespace matcha::gui {
           = {ColorToken::colorBgContainerTertiary, ColorToken::colorTextSecondary, ColorToken::colorBorderSecondary};
       unchecked.colors[std::to_underlying(InteractionState::Hovered)]
           = {ColorToken::colorBgContainerTertiary, ColorToken::colorTextSecondary, ColorToken::colorPrimaryBgHover};
+      unchecked.colors[std::to_underlying(InteractionState::Pressed)]
+          = {ColorToken::colorBgContainerTertiary, ColorToken::colorTextSecondary, ColorToken::colorPrimaryActive};
       unchecked.colors[std::to_underlying(InteractionState::Disabled)]
           = {ColorToken::colorBgContainerTertiary, ColorToken::colorTextQuaternary, ColorToken::colorBorder, 0.45F};
       unchecked.colors[std::to_underlying(InteractionState::Focused)]
@@ -1151,6 +1154,8 @@ namespace matcha::gui {
           = {ColorToken::colorPrimary, ColorToken::OnAccent, ColorToken::colorPrimary};
       checked.colors[std::to_underlying(InteractionState::Hovered)]
           = {ColorToken::colorPrimaryBgHover, ColorToken::OnAccent, ColorToken::colorPrimaryBgHover};
+      checked.colors[std::to_underlying(InteractionState::Pressed)]
+          = {ColorToken::colorPrimaryActive, ColorToken::OnAccent, ColorToken::colorPrimaryActive};
       checked.colors[std::to_underlying(InteractionState::Disabled)]
           = {ColorToken::colorPrimaryBorder, ColorToken::colorTextQuaternary, ColorToken::colorPrimaryBorder, 0.45F};
       checked.colors[std::to_underlying(InteractionState::Focused)]
@@ -1173,6 +1178,8 @@ namespace matcha::gui {
       };
       off.colors[std::to_underlying(InteractionState::Disabled)]
           = {ColorToken::colorFill, ColorToken::colorFillTertiaryHover, ColorToken::colorBorder, 0.45F};
+      off.colors[std::to_underlying(InteractionState::Focused)]
+          = {ColorToken::colorFill, ColorToken::colorBgContainerTertiary, ColorToken::Focus};
 
       VariantStyle on{};
       on.colors[std::to_underlying(InteractionState::Normal)]
@@ -1183,6 +1190,8 @@ namespace matcha::gui {
           = {ColorToken::colorPrimaryActive, ColorToken::OnAccent, ColorToken::colorPrimaryActive};
       on.colors[std::to_underlying(InteractionState::Disabled)]
           = {ColorToken::colorPrimaryBorder, ColorToken::colorTextQuaternary, ColorToken::colorPrimaryBorder, 0.45F};
+      on.colors[std::to_underlying(InteractionState::Focused)]
+          = {ColorToken::colorPrimary, ColorToken::OnAccent, ColorToken::Focus};
 
       BindStateStyleKeys(off);
       BindStateStyleKeys(on);
@@ -1234,6 +1243,7 @@ namespace matcha::gui {
       input.colors[std::to_underlying(InteractionState::Error)]
           = {ColorToken::colorErrorBg, ColorToken::colorText, ColorToken::colorError};
 
+      BindStateStyleKeys(input);
       _variantStorage[idx] = {input};
     }
 
@@ -1246,11 +1256,14 @@ namespace matcha::gui {
           = {ColorToken::colorFillHover, ColorToken::colorText, ColorToken::colorBorderSecondary};
       combo.colors[std::to_underlying(InteractionState::Focused)]
           = {ColorToken::colorBgContainerTertiary, ColorToken::colorPrimary, ColorToken::colorPrimaryActive};
+      combo.colors[std::to_underlying(InteractionState::Selected)]
+          = {ColorToken::colorPrimaryBgHover, ColorToken::colorPrimary, ColorToken::colorPrimaryBgHover};
       combo.colors[std::to_underlying(InteractionState::Disabled)]
           = {ColorToken::colorFill, ColorToken::colorTextQuaternary, ColorToken::colorBorder, 0.45F};
       combo.colors[std::to_underlying(InteractionState::Error)]
           = {ColorToken::colorErrorBg, ColorToken::colorText, ColorToken::colorError};
 
+      BindStateStyleKeys(combo);
       _variantStorage[idx] = {combo};
     }
 
@@ -1341,6 +1354,7 @@ namespace matcha::gui {
       slider.colors[std::to_underlying(InteractionState::Focused)]
           = {ColorToken::colorFill, ColorToken::colorPrimary, ColorToken::Focus};
 
+      BindStateStyleKeys(slider);
       _variantStorage[idx] = {slider};
     }
   }
@@ -1411,9 +1425,16 @@ namespace matcha::gui {
     pushButton.minHeightKey = "controlHeightMD";
 
     BindWidgetStyleKeys(toolButton);
+    BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::Label)]);
+    BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::Message)]);
+    BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::Notification)]);
+    BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::Slider)]);
+    BindWidgetStyleKeys(statusBar);
     BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::CheckBox)]);
     BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::RadioButton)]);
     BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::Toggle)]);
+    BindWidgetStyleKeys(_styleSheets[std::to_underlying(WidgetKind::LineEdit)]);
+    BindWidgetStyleKeys(comboBox);
 
     BindWidgetStyleKeys(tooltip);
     BindWidgetStyleKeys(popConfirm);

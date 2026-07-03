@@ -13,6 +13,14 @@
 #include <QPainter>
 
 namespace matcha::gui {
+namespace {
+[[nodiscard]] auto ResolveColorKey(
+    const IThemeService& theme, std::string_view key, const QColor& fallback
+) -> QColor
+{
+    return theme.Color(key).value_or(fallback);
+}
+} // namespace
 
 // ============================================================================
 // Construction
@@ -85,21 +93,24 @@ auto NyanBadge::sizeHint() const -> QSize
 auto NyanBadge::ResolveColors() const -> ResolvedColors
 {
     // Semantic badge variant colors — not in the variant matrix
+    const auto style = Theme().Resolve(WidgetKind::Label, 0, InteractionState::Normal);
+    const QColor onAccent = ResolveColorKey(Theme(), "OnAccent", style.foreground);
     switch (_variant) {
     case BadgeVariant::Success:
-        return {Theme().Color(ColorToken::colorSuccess), Theme().Color(ColorToken::OnAccent)};
+        return {ResolveColorKey(Theme(), "colorSuccess", style.background), onAccent};
     case BadgeVariant::Warning:
-        return {Theme().Color(ColorToken::colorWarning), Theme().Color(ColorToken::OnAccent)};
+        return {ResolveColorKey(Theme(), "colorWarning", style.background), onAccent};
     case BadgeVariant::Error:
-        return {Theme().Color(ColorToken::colorError), Theme().Color(ColorToken::OnAccent)};
+        return {ResolveColorKey(Theme(), "colorError", style.background), onAccent};
     case BadgeVariant::Info:
-        return {Theme().Color(ColorToken::colorPrimary), Theme().Color(ColorToken::OnAccent)};
+        return {ResolveColorKey(Theme(), "colorPrimary", style.background), onAccent};
     case BadgeVariant::Custom:
-        return {_customColor.isValid() ? _customColor : Theme().Color(ColorToken::colorFill),
-                Theme().Color(ColorToken::OnAccent)};
+        return {_customColor.isValid() ? _customColor : ResolveColorKey(Theme(), "colorFill", style.background),
+                onAccent};
     case BadgeVariant::Neutral:
     default:
-        return {Theme().Color(ColorToken::colorFill), Theme().Color(ColorToken::colorText)};
+        return {ResolveColorKey(Theme(), "colorFill", style.background),
+                ResolveColorKey(Theme(), "colorText", style.foreground)};
     }
 }
 

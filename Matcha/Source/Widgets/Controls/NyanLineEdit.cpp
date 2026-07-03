@@ -10,6 +10,7 @@
 #include <QDoubleValidator>
 #include <QFontMetrics>
 #include <QIntValidator>
+#include <QPalette>
 #include <QPaintEvent>
 #include <QPainter>
 
@@ -24,6 +25,7 @@ NyanLineEdit::NyanLineEdit(QWidget* parent)
     , ThemeAware(WidgetKind::LineEdit)
 {
     setFixedHeight(kFixedHeight);
+    setFrame(false);
     _leFilter = new LineEditEventFilter(this, nullptr);
 }
 
@@ -84,9 +86,8 @@ void NyanLineEdit::SetUnitSuffix(const QString& suffix)
     _unitSuffix = suffix;
     // Reserve right margin for suffix text
     if (!_unitSuffix.isEmpty()) {
-        const auto& fontSpec = Theme().Font(StyleSheet().font);
-        QFont f(fontSpec.family, fontSpec.sizeInPt, fontSpec.weight, fontSpec.italic);
-        QFontMetrics fm(f);
+        const auto style = Theme().Resolve(WidgetKind::LineEdit, 0, InteractionState::Normal);
+        QFontMetrics fm(style.font);
         const int suffixW = fm.horizontalAdvance(_unitSuffix) + kSuffixGap + kHPadding;
         setTextMargins(0, 0, suffixW, 0);
     } else {
@@ -134,9 +135,8 @@ auto NyanLineEdit::sizeHint() const -> QSize
 {
     QSize s = QLineEdit::sizeHint();
     if (!_unitSuffix.isEmpty()) {
-        const auto& fontSpec = Theme().Font(StyleSheet().font);
-        QFont f(fontSpec.family, fontSpec.sizeInPt, fontSpec.weight, fontSpec.italic);
-        QFontMetrics fm(f);
+        const auto style = Theme().Resolve(WidgetKind::LineEdit, 0, InteractionState::Normal);
+        QFontMetrics fm(style.font);
         s.setWidth(s.width() + fm.horizontalAdvance(_unitSuffix) + kSuffixGap + kHPadding);
     }
     s.setHeight(kFixedHeight);
@@ -154,15 +154,28 @@ auto NyanLineEdit::minimumSizeHint() const -> QSize
 
 void NyanLineEdit::paintEvent(QPaintEvent* event)
 {
+    const auto istate = !isEnabled() ? InteractionState::Disabled
+                      : isReadOnly() ? InteractionState::Disabled
+                                     : _leFilter->Controller().GetInteractionState();
+    const auto style = Theme().Resolve(WidgetKind::LineEdit, 0, istate);
+
+    setFont(style.font);
+
+    QPalette pal = palette();
+    pal.setColor(QPalette::Base, style.background);
+    pal.setColor(QPalette::Text, style.foreground);
+    QColor placeholder = style.foreground;
+    placeholder.setAlpha(150);
+    pal.setColor(QPalette::PlaceholderText, placeholder);
+    pal.setColor(QPalette::Highlight, style.border);
+    pal.setColor(QPalette::HighlightedText, style.background);
+    setPalette(pal);
+
     // Let QLineEdit paint text content first
     QLineEdit::paintEvent(event);
 
     QPainter p(this);
     p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
-
-    const auto istate = _leFilter->Controller().GetInteractionState();
-
-    const auto style = Theme().Resolve(WidgetKind::LineEdit, 0, istate);
 
     const QRect r = rect().adjusted(0, 0, -1, -1);
 
@@ -193,15 +206,17 @@ void NyanLineEdit::paintEvent(QPaintEvent* event)
         );
         p.drawText(suffixRect, Qt::AlignRight | Qt::AlignVCenter, _unitSuffix);
     }
+
+    p.end();
+    PaintFocusRing(this, Theme(), style.radiusPx);
 }
 
 void NyanLineEdit::OnThemeChanged()
 {
     // Re-apply suffix margins with updated font metrics
     if (!_unitSuffix.isEmpty()) {
-        const auto& fontSpec = Theme().Font(StyleSheet().font);
-        QFont f(fontSpec.family, fontSpec.sizeInPt, fontSpec.weight, fontSpec.italic);
-        QFontMetrics fm(f);
+        const auto style = Theme().Resolve(WidgetKind::LineEdit, 0, InteractionState::Normal);
+        QFontMetrics fm(style.font);
         const int suffixW = fm.horizontalAdvance(_unitSuffix) + kSuffixGap + kHPadding;
         setTextMargins(0, 0, suffixW, 0);
     }

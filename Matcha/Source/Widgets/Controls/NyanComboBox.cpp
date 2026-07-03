@@ -8,6 +8,8 @@
 #include "../_Private/ComboBoxEventFilter.h"
 
 #include <QCompleter>
+#include <QListView>
+#include <QPalette>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -22,6 +24,9 @@ NyanComboBox::NyanComboBox(QWidget* parent)
 {
     setFixedHeight(kFixedHeight);
     _cbFilter = new ComboBoxEventFilter(this, nullptr);
+    QObject::connect(this, &QComboBox::activated, this,
+                     [this](int) { _cbFilter->NotifyItemSelected(); });
+    ApplyNativeBoundaryStyle();
 }
 
 NyanComboBox::~NyanComboBox() = default;
@@ -142,6 +147,7 @@ void NyanComboBox::paintEvent(QPaintEvent* /*event*/)
     const auto istate = _cbFilter->Controller().GetInteractionState();
 
     const auto style = Theme().Resolve(WidgetKind::ComboBox, 0, istate);
+    p.setOpacity(style.opacity);
     const QRect r = rect().adjusted(1, 1, -1, -1);
 
     // -- Draw combo frame --
@@ -189,7 +195,32 @@ void NyanComboBox::paintEvent(QPaintEvent* /*event*/)
 
 void NyanComboBox::OnThemeChanged()
 {
+    ApplyNativeBoundaryStyle();
     update();
+}
+
+void NyanComboBox::ApplyNativeBoundaryStyle()
+{
+    const auto normal = Theme().Resolve(WidgetKind::ComboBox, 0, InteractionState::Normal);
+    const auto selected = Theme().Resolve(WidgetKind::ComboBox, 0, InteractionState::Selected);
+    const auto disabled = Theme().Resolve(WidgetKind::ComboBox, 0, InteractionState::Disabled);
+
+    setFont(normal.font);
+
+    QPalette pal = palette();
+    pal.setColor(QPalette::Base, normal.background);
+    pal.setColor(QPalette::Text, normal.foreground);
+    pal.setColor(QPalette::ButtonText, normal.foreground);
+    pal.setColor(QPalette::Disabled, QPalette::Text, disabled.foreground);
+    pal.setColor(QPalette::Highlight, selected.background);
+    pal.setColor(QPalette::HighlightedText, selected.foreground);
+    setPalette(pal);
+
+    if (auto* v = view()) {
+        v->setFont(normal.font);
+        v->setPalette(pal);
+        v->setMouseTracking(true);
+    }
 }
 
 } // namespace matcha::gui

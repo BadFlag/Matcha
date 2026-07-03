@@ -89,10 +89,7 @@ void NyanToolButton::paintEvent(QPaintEvent* /*event*/)
     const bool checked = isCheckable() && isChecked();
     const std::size_t variantIdx = checked ? 1 : 0;
 
-    auto istate = !isEnabled() ? InteractionState::Disabled
-                : isDown()     ? InteractionState::Pressed
-                : underMouse() ? InteractionState::Hovered
-                               : InteractionState::Normal;
+    const auto istate = _swFilter->Controller().GetInteractionState();
 
     const auto style = Theme().Resolve(WidgetKind::ToolButton, variantIdx, istate);
     p.setOpacity(style.opacity);
@@ -132,6 +129,9 @@ void NyanToolButton::paintEvent(QPaintEvent* /*event*/)
         arrow.closeSubpath();
         p.drawPath(arrow);
     }
+
+    p.end();
+    PaintFocusRing(this, Theme(), style.radiusPx);
 }
 
 void NyanToolButton::mousePressEvent(QMouseEvent* event)

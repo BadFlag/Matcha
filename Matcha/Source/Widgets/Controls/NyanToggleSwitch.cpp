@@ -20,6 +20,7 @@ NyanToggleSwitch::NyanToggleSwitch(QWidget* parent)
 {
     setFixedSize(sizeHint());
     setCursor(Qt::PointingHandCursor);
+    setFocusPolicy(Qt::StrongFocus);
     _swFilter = new SimpleWidgetEventFilter(this, nullptr);
 }
 
@@ -32,9 +33,16 @@ void NyanToggleSwitch::SetChecked(bool checked)
     }
     _checked = checked;
 
+    const int durationMs = Theme().AnimationMs(StyleSheet().transition.duration);
+    if (durationMs <= 0) {
+        _knobPos = _checked ? 1.0 : 0.0;
+        update();
+        emit Toggled(_checked);
+        return;
+    }
+
     // Animate knob position
     auto* anim = new QVariantAnimation(this);
-    const int durationMs = Theme().AnimationMs(StyleSheet().transition.duration);
     anim->setDuration(durationMs);
     anim->setEasingCurve(QEasingCurve::InOutCubic);
     anim->setStartValue(_knobPos);
@@ -75,9 +83,7 @@ void NyanToggleSwitch::paintEvent(QPaintEvent* /*event*/)
 
     // Resolve variant: Off=0, On=1
     const std::size_t variantIdx = _checked ? 1 : 0;
-    const auto istate = !isEnabled() ? InteractionState::Disabled
-                      : underMouse() ? InteractionState::Hovered
-                                     : InteractionState::Normal;
+    const auto istate = _swFilter->Controller().GetInteractionState();
 
     const auto style = Theme().Resolve(WidgetKind::Toggle, variantIdx, istate);
     p.setOpacity(style.opacity);
@@ -117,6 +123,9 @@ void NyanToggleSwitch::paintEvent(QPaintEvent* /*event*/)
         p.setFont(style.font);
         p.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, label);
     }
+
+    p.end();
+    PaintFocusRing(this, Theme(), style.radiusPx);
 }
 
 void NyanToggleSwitch::mousePressEvent(QMouseEvent* event)

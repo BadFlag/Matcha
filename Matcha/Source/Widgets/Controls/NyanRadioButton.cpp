@@ -48,9 +48,7 @@ void NyanRadioButton::paintEvent(QPaintEvent* /*event*/)
     // Resolve variant: Unchecked=0, Checked=1
     const std::size_t variantIdx = isChecked() ? 1 : 0;
 
-    const auto istate = !isEnabled() ? InteractionState::Disabled
-                      : underMouse() ? InteractionState::Hovered
-                                     : InteractionState::Normal;
+    const auto istate = _swFilter->Controller().GetInteractionState();
 
     const auto style = Theme().Resolve(WidgetKind::RadioButton, variantIdx, istate);
     p.setOpacity(style.opacity);
@@ -85,6 +83,9 @@ void NyanRadioButton::paintEvent(QPaintEvent* /*event*/)
     p.setPen(style.foreground);
     p.setFont(style.font);
     p.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, text());
+
+    p.end();
+    PaintFocusRing(this, Theme(), style.radiusPx);
 }
 
 void NyanRadioButton::OnThemeChanged()

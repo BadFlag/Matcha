@@ -13,6 +13,22 @@
 #include <QPushButton>
 
 namespace matcha::gui {
+namespace {
+[[nodiscard]] auto MessageBackgroundKey(MessageType type) -> std::string_view
+{
+    switch (type) {
+    case MessageType::Info:
+        return "colorPrimaryBgHover";
+    case MessageType::Success:
+        return "colorSuccessHover";
+    case MessageType::Warning:
+        return "colorWarningHover";
+    case MessageType::Error:
+        return "colorErrorHover";
+    }
+    return "colorPrimaryBgHover";
+}
+} // namespace
 
 NyanMessage::NyanMessage(QWidget* parent)
     : QWidget(parent)
@@ -62,14 +78,9 @@ void NyanMessage::paintEvent(QPaintEvent* event)
     QPainter p(this);
 
     // Semantic bg color depends on message type — not in variant matrix
-    ColorToken bgToken = ColorToken::colorPrimaryBgHover;
-    switch (_type) {
-    case MessageType::Info:    bgToken = ColorToken::colorPrimaryBgHover; break;
-    case MessageType::Success: bgToken = ColorToken::colorSuccessHover; break;
-    case MessageType::Warning: bgToken = ColorToken::colorWarningHover; break;
-    case MessageType::Error:   bgToken = ColorToken::colorErrorHover;   break;
-    }
-    p.fillRect(rect(), Theme().Color(bgToken));
+    const auto style = Theme().Resolve(WidgetKind::Message, 0, InteractionState::Normal);
+    const auto background = Theme().Color(MessageBackgroundKey(_type)).value_or(style.background);
+    p.fillRect(rect(), background);
 }
 
 void NyanMessage::OnThemeChanged()

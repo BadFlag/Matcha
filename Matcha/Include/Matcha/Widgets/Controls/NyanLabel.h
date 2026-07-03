@@ -5,8 +5,7 @@
  * @brief Theme-aware label with role-based font selection and elide support.
  *
  * Inherits QLabel for Qt label semantics and ThemeAware for design token
- * integration. The font is automatically resolved from `LabelRole` ->
- * `FontRole` mapping via `IThemeService::Font()`.
+ * integration. The font is resolved from `LabelRole` to theme font keys.
  *
  * @par Old project reference
  * - `old/NyanGuis/PublicInterfaces/NyanLabel.h` (3 LabelState enum)
@@ -21,7 +20,7 @@
  * - Caption -> Caption  (8pt Normal, Foreground2)
  *
  * @see ThemeAware for mixin lifecycle.
- * @see DesignTokens.h for FontRole enum.
+ * @see ThemeAware for key-driven token resolution.
  */
 
 #include <Matcha/Core/Macros.h>
@@ -35,22 +34,6 @@
 namespace matcha::gui {
 
 class SimpleWidgetEventFilter;
-
-/**
- * @brief Map LabelRole to FontRole for theme font resolution.
- * @param role Label role.
- * @return Corresponding FontRole.
- */
-[[nodiscard]] constexpr auto ToFontRole(LabelRole role) noexcept -> FontRole
-{
-    switch (role) {
-    case LabelRole::Title:   return FontRole::fontLineHeight;
-    case LabelRole::Name:    return FontRole::fontWeightMedium;
-    case LabelRole::Body:    return FontRole::fontSizeMD;
-    case LabelRole::Caption: return FontRole::fontSizeXS;
-    default:                 return FontRole::fontSizeMD;
-    }
-}
 
 /**
  * @brief Theme-aware label with role-based font and elide support.

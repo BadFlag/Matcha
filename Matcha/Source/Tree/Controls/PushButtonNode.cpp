@@ -7,6 +7,8 @@
 #include <QIcon>
 #include <QString>
 
+#include <utility>
+
 namespace matcha::fw {
 
 MATCHA_IMPLEMENT_CLASS(PushButtonNode, WidgetNode)
@@ -39,6 +41,7 @@ void PushButtonNode::SetVariant(gui::ButtonVariant variant)
     EnsureWidget();
     if (auto* w = qobject_cast<gui::NyanPushButton*>(_widget)) {
         w->SetVariant(variant);
+        OnIconChanged();
     }
 }
 
@@ -79,7 +82,11 @@ void PushButtonNode::OnIconChanged()
         return;
     }
     const int sizePx = static_cast<int>(_iconSize);
-    const QColor fg = gui::GetThemeService().Color(gui::ColorToken::colorText);
+    const QColor fg = gui::GetThemeService()
+        .Resolve(gui::WidgetKind::PushButton,
+                 static_cast<std::size_t>(std::to_underlying(w->Variant())),
+                 gui::InteractionState::Normal)
+        .foreground;
     const QPixmap pm = gui::GetThemeService().ResolveIcon(_iconId, _iconSize, fg);
     if (!pm.isNull()) {
         w->setIcon(QIcon(pm));

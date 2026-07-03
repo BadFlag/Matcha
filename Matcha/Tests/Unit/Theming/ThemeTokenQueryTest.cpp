@@ -604,6 +604,106 @@ TEST_CASE("Low risk self-painted controls expose key driven style fields") {
         CHECK(style.gapPx == *gap);
         CHECK(style.radiusPx == *radius);
         CHECK(style.font.pointSize() == font->sizeInPt);
+
+        const auto pressed = theme.Resolve(kind, 0, InteractionState::Pressed);
+        const auto focused = theme.Resolve(kind, 0, InteractionState::Focused);
+        CHECK(pressed.background.isValid());
+        CHECK(focused.border.isValid());
+    }
+}
+
+TEST_CASE("First-batch native-boundary controls expose key driven style fields") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    const std::array kinds = {
+        WidgetKind::LineEdit,
+        WidgetKind::ComboBox,
+    };
+
+    for (const auto kind : kinds) {
+        const auto& sheet = theme.ResolveStyleSheet(kind);
+
+        REQUIRE(sheet.fontKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Font, *sheet.fontKey));
+        REQUIRE(sheet.radiusKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Dimension, *sheet.radiusKey));
+        REQUIRE(sheet.paddingHKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Dimension, *sheet.paddingHKey));
+
+        REQUIRE_FALSE(sheet.variants.empty());
+        const auto& normal = sheet.variants[0].colors[std::to_underlying(InteractionState::Normal)];
+        const auto& focused = sheet.variants[0].colors[std::to_underlying(InteractionState::Focused)];
+        const auto& disabled = sheet.variants[0].colors[std::to_underlying(InteractionState::Disabled)];
+        REQUIRE(normal.backgroundKey.has_value());
+        REQUIRE(normal.foregroundKey.has_value());
+        REQUIRE(normal.borderKey.has_value());
+        REQUIRE(focused.borderKey.has_value());
+        REQUIRE(disabled.foregroundKey.has_value());
+
+        const auto normalStyle = theme.Resolve(kind, 0, InteractionState::Normal);
+        const auto focusedStyle = theme.Resolve(kind, 0, InteractionState::Focused);
+        const auto disabledStyle = theme.Resolve(kind, 0, InteractionState::Disabled);
+        CHECK(normalStyle.background == *theme.Color(*normal.backgroundKey));
+        CHECK(normalStyle.foreground == *theme.Color(*normal.foregroundKey));
+        CHECK(normalStyle.border == *theme.Color(*normal.borderKey));
+        CHECK(focusedStyle.border == *theme.Color(*focused.borderKey));
+        CHECK(disabledStyle.foreground == *theme.Color(*disabled.foregroundKey));
+    }
+}
+
+TEST_CASE("Stage 8 second-batch self-painted controls expose key driven style fields") {
+    NyanTheme theme(QStringLiteral(MATCHA_TEST_PALETTE_DIR));
+    RegisterAndLoadLight(theme);
+
+    const std::array kinds = {
+        WidgetKind::Label,
+        WidgetKind::Message,
+        WidgetKind::Notification,
+        WidgetKind::Slider,
+        WidgetKind::StatusBar,
+    };
+
+    for (const auto kind : kinds) {
+        const auto& sheet = theme.ResolveStyleSheet(kind);
+
+        REQUIRE(sheet.fontKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Font, *sheet.fontKey));
+        REQUIRE(sheet.radiusKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Dimension, *sheet.radiusKey));
+        REQUIRE(sheet.paddingHKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Dimension, *sheet.paddingHKey));
+        REQUIRE(sheet.paddingVKey.has_value());
+        CHECK(theme.HasToken(TokenKind::Dimension, *sheet.paddingVKey));
+
+        REQUIRE_FALSE(sheet.variants.empty());
+        const auto& normal = sheet.variants[0].colors[std::to_underlying(InteractionState::Normal)];
+        REQUIRE(normal.backgroundKey.has_value());
+        REQUIRE(normal.foregroundKey.has_value());
+        REQUIRE(normal.borderKey.has_value());
+
+        const auto style = theme.Resolve(kind, 0, InteractionState::Normal);
+        const auto background = theme.Color(*normal.backgroundKey);
+        const auto foreground = theme.Color(*normal.foregroundKey);
+        const auto border = theme.Color(*normal.borderKey);
+        const auto radius = theme.DimensionPx(*sheet.radiusKey);
+        const auto paddingH = theme.DimensionPx(*sheet.paddingHKey);
+        const auto paddingV = theme.DimensionPx(*sheet.paddingVKey);
+        const auto font = theme.Font(*sheet.fontKey);
+        REQUIRE(background.has_value());
+        REQUIRE(foreground.has_value());
+        REQUIRE(border.has_value());
+        REQUIRE(radius.has_value());
+        REQUIRE(paddingH.has_value());
+        REQUIRE(paddingV.has_value());
+        REQUIRE(font.has_value());
+        CHECK(style.background == *background);
+        CHECK(style.foreground == *foreground);
+        CHECK(style.border == *border);
+        CHECK(style.radiusPx == *radius);
+        CHECK(style.paddingHPx == *paddingH);
+        CHECK(style.paddingVPx == *paddingV);
+        CHECK(style.font.pointSize() == font->sizeInPt);
     }
 }
 

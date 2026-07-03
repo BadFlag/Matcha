@@ -8,7 +8,32 @@
 #include <QPropertyAnimation>
 #include <QPushButton>
 
+#include <string_view>
+
 namespace matcha::gui {
+namespace {
+[[nodiscard]] auto ResolveColorKey(
+    const IThemeService& theme, std::string_view key, const QColor& fallback
+) -> QColor
+{
+    return theme.Color(key).value_or(fallback);
+}
+
+[[nodiscard]] auto NotificationTypeColorKey(NotificationType type) -> std::string_view
+{
+    switch (type) {
+    case NotificationType::Success:
+        return "colorSuccess";
+    case NotificationType::Warning:
+        return "colorWarning";
+    case NotificationType::Error:
+        return "colorError";
+    case NotificationType::Info:
+    default:
+        return "colorText";
+    }
+}
+} // namespace
 
 // ============================================================================
 // NyanNotification
@@ -118,7 +143,8 @@ void NyanNotification::SetAction(const QString& text, std::function<void()> call
     _actionButton->show();
 
     const auto& theme = Theme();
-    QString style = QString(
+    const auto resolved = theme.Resolve(WidgetKind::Notification, 0, InteractionState::Normal);
+    QString css = QString(
         "QPushButton {"
         "  background: transparent;"
         "  border: none;"
@@ -129,8 +155,8 @@ void NyanNotification::SetAction(const QString& text, std::function<void()> call
         "QPushButton:hover {"
         "  text-decoration: underline;"
         "}"
-    ).arg(theme.Color(ColorToken::colorPrimary).name());
-    _actionButton->setStyleSheet(style);
+    ).arg(ResolveColorKey(theme, "colorPrimary", resolved.foreground).name());
+    _actionButton->setStyleSheet(css);
 }
 
 void NyanNotification::ClearAction()
@@ -199,6 +225,7 @@ void NyanNotification::paintEvent(QPaintEvent* /*event*/)
     p.setRenderHint(QPainter::Antialiasing);
 
     const auto& theme = Theme();
+    const auto style = theme.Resolve(WidgetKind::Notification, 0, InteractionState::Normal);
 
     // Background with shadow effect
     QRect bgRect = rect().adjusted(2, 2, -2, -2);
@@ -209,7 +236,7 @@ void NyanNotification::paintEvent(QPaintEvent* /*event*/)
     p.drawRoundedRect(bgRect.adjusted(2, 2, 2, 2), kRadius, kRadius);
 
     // Background
-    p.setBrush(theme.Color(ColorToken::colorPrimary));
+    p.setBrush(style.background);
     p.setPen(QPen(TypeColor(), 2));
     p.drawRoundedRect(bgRect, kRadius, kRadius);
 
@@ -223,9 +250,25 @@ void NyanNotification::OnThemeChanged()
     UpdateIcon();
 
     const auto& theme = Theme();
+    const auto style = theme.Resolve(WidgetKind::Notification, 0, InteractionState::Normal);
 
     // Update message label style
-    _messageLabel->setStyleSheet(QString("color: %1;").arg(theme.Color(ColorToken::colorText).name()));
+    _messageLabel->setStyleSheet(QString("color: %1;").arg(style.foreground.name()));
+
+    if (_actionButton->isVisible()) {
+        _actionButton->setStyleSheet(QString(
+            "QPushButton {"
+            "  background: transparent;"
+            "  border: none;"
+            "  color: %1;"
+            "  font-weight: bold;"
+            "  padding: 4px 8px;"
+            "}"
+            "QPushButton:hover {"
+            "  text-decoration: underline;"
+            "}"
+        ).arg(ResolveColorKey(theme, "colorPrimary", style.foreground).name()));
+    }
 
     // Update close button style
     QString closeStyle = QString(
@@ -239,8 +282,8 @@ void NyanNotification::OnThemeChanged()
         "QPushButton:hover {"
         "  color: %2;"
         "}"
-    ).arg(theme.Color(ColorToken::colorTextTertiary).name(),
-          theme.Color(ColorToken::colorText).name());
+    ).arg(ResolveColorKey(theme, "colorTextTertiary", style.foreground).name(),
+          style.foreground.name());
     _closeButton->setStyleSheet(closeStyle);
 
     update();
@@ -362,18 +405,8 @@ void NyanNotification::OnCloseClicked()
 auto NyanNotification::TypeColor() const -> QColor
 {
     const auto& theme = Theme();
-
-    switch (_type) {
-    case NotificationType::Success:
-        return theme.Color(ColorToken::colorSuccess);
-    case NotificationType::Warning:
-        return theme.Color(ColorToken::colorWarning);
-    case NotificationType::Error:
-        return theme.Color(ColorToken::colorError);
-    case NotificationType::Info:
-    default:
-        return theme.Color(ColorToken::colorText);
-    }
+    const auto style = theme.Resolve(WidgetKind::Notification, 0, InteractionState::Normal);
+    return ResolveColorKey(theme, NotificationTypeColorKey(_type), style.foreground);
 }
 
 auto NyanNotification::TypeIcon() const -> QString

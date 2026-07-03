@@ -14,7 +14,29 @@
 #include <QPaintEvent>
 #include <QPainter>
 
+#include <utility>
+
 namespace matcha::gui {
+
+namespace {
+
+[[nodiscard]] auto LabelFontKey(LabelRole role) -> const char*
+{
+    switch (role) {
+    case LabelRole::Title:   return "fontLG";
+    case LabelRole::Name:    return "fontSM";
+    case LabelRole::Body:    return "fontMD";
+    case LabelRole::Caption: return "fontXS";
+    default:                 return "fontMD";
+    }
+}
+
+[[nodiscard]] auto LabelVariantIndex(LabelRole role) -> std::size_t
+{
+    return static_cast<std::size_t>(std::to_underlying(role));
+}
+
+} // anonymous namespace
 
 NyanLabel::NyanLabel(QWidget* parent)
     : QLabel(parent)
@@ -88,12 +110,15 @@ void NyanLabel::paintEvent(QPaintEvent* /*event*/)
 
     const auto istate = !isEnabled() ? InteractionState::Disabled
                                      : InteractionState::Normal;
-    const auto style = Theme().Resolve(WidgetKind::Label, 0, istate);
+    const auto style = Theme().Resolve(WidgetKind::Label, LabelVariantIndex(_role), istate);
 
-    // Override font with role-specific font (Label has multiple font roles)
-    const FontRole fontRole = ToFontRole(_role);
-    const auto& fontSpec = Theme().Font(fontRole);
-    QFont f(fontSpec.family, fontSpec.sizeInPt, fontSpec.weight, fontSpec.italic);
+    QFont f = style.font;
+    if (const auto fontSpec = Theme().Font(LabelFontKey(_role))) {
+        f = QFont(fontSpec->family, fontSpec->sizeInPt, fontSpec->weight, fontSpec->italic);
+        if (fontSpec->letterSpacing != 0.0) {
+            f.setLetterSpacing(QFont::AbsoluteSpacing, fontSpec->letterSpacing);
+        }
+    }
     p.setFont(f);
     p.setOpacity(style.opacity);
     p.setPen(style.foreground);

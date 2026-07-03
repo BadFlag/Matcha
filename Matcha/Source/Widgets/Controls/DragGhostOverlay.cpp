@@ -106,11 +106,11 @@ void DragGhostOverlay::paintEvent(QPaintEvent* /*event*/)
     switch (_config.style) {
     case matcha::fw::DragPreviewStyle::Ghost:
         bgColor = theme.Color(ColorToken::colorPrimaryBg);
-        bgColor.setAlphaF(0.85);
+        bgColor.setAlphaF(0.85f);
         break;
     case matcha::fw::DragPreviewStyle::Icon:
         bgColor = theme.Color(ColorToken::colorPrimary);
-        bgColor.setAlphaF(0.9);
+        bgColor.setAlphaF(0.9f);
         break;
     case matcha::fw::DragPreviewStyle::Compact:
     case matcha::fw::DragPreviewStyle::Custom:

@@ -7,6 +7,8 @@
 #include <QIcon>
 #include <QString>
 
+#include <utility>
+
 namespace matcha::fw {
 
 MATCHA_IMPLEMENT_CLASS(ToolButtonNode, WidgetNode)
@@ -55,6 +57,7 @@ void ToolButtonNode::SetChecked(bool checked)
     EnsureWidget();
     if (auto* w = qobject_cast<gui::NyanToolButton*>(_widget)) {
         w->setChecked(checked);
+        OnIconChanged();
     }
 }
 
@@ -72,6 +75,9 @@ auto ToolButtonNode::CreateWidget(QWidget* parent) -> QWidget*
     QObject::connect(w, &QToolButton::clicked, w, [this]() {
         Activated notif;
         SendNotification(this, notif);
+    });
+    QObject::connect(w, &QToolButton::toggled, w, [this](bool) {
+        OnIconChanged();
     });
     QObject::connect(w, &gui::NyanToolButton::RightClicked, w, [this]() {
         RightClicked notif;
@@ -91,7 +97,10 @@ void ToolButtonNode::OnIconChanged()
         return;
     }
     const int sizePx = static_cast<int>(_iconSize);
-    const QColor fg = gui::GetThemeService().Color(gui::ColorToken::colorText);
+    const std::size_t variantIdx = (w->isCheckable() && w->isChecked()) ? 1U : 0U;
+    const QColor fg = gui::GetThemeService()
+        .Resolve(gui::WidgetKind::ToolButton, variantIdx, gui::InteractionState::Normal)
+        .foreground;
     const QPixmap pm = gui::GetThemeService().ResolveIcon(_iconId, _iconSize, fg);
     if (!pm.isNull()) {
         w->setIcon(QIcon(pm));

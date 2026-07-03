@@ -53,9 +53,7 @@ void NyanCheckBox::paintEvent(QPaintEvent* /*event*/)
                                                                      : 0;
 
     // Resolve interaction state
-    const auto istate = !isEnabled() ? InteractionState::Disabled
-                      : underMouse() ? InteractionState::Hovered
-                                     : InteractionState::Normal;
+    const auto istate = _swFilter->Controller().GetInteractionState();
 
     const auto style = Theme().Resolve(WidgetKind::CheckBox, variantIdx, istate);
     p.setOpacity(style.opacity);
@@ -106,6 +104,9 @@ void NyanCheckBox::paintEvent(QPaintEvent* /*event*/)
     p.setPen(style.foreground);
     p.setFont(style.font);
     p.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, text());
+
+    p.end();
+    PaintFocusRing(this, Theme(), style.radiusPx);
 }
 
 void NyanCheckBox::OnThemeChanged()

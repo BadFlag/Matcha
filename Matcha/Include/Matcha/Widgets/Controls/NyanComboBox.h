@@ -104,6 +104,8 @@ protected:
     void OnThemeChanged() override;
 
 private:
+    void ApplyNativeBoundaryStyle();
+
     static constexpr int kMinWidth      = 140; ///< Minimum combo width in px
     static constexpr int kFixedHeight   = 24;  ///< Fixed combo height in px
     static constexpr int kArrowSize     = 16;  ///< Arrow icon area size in px

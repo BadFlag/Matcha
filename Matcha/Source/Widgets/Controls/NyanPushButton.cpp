@@ -145,6 +145,9 @@ void NyanPushButton::paintEvent(QPaintEvent* /*event*/)
         // Text-only (centered)
         p.drawText(r, Qt::AlignCenter, text());
     }
+
+    p.end();
+    PaintFocusRing(this, Theme(), style.radiusPx);
 }
 
 void NyanPushButton::OnThemeChanged()

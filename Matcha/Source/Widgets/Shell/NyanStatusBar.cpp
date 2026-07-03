@@ -106,11 +106,11 @@ auto NyanStatusBar::minimumSizeHint() const -> QSize
 void NyanStatusBar::paintEvent(QPaintEvent* /*event*/)
 {
     QPainter p(this);
-    const auto& theme = Theme();
+    const auto style = Theme().Resolve(WidgetKind::StatusBar, 0, InteractionState::Normal);
 
-    p.fillRect(rect(), theme.Color(ColorToken::colorPrimary));
+    p.fillRect(rect(), Theme().Color("colorPrimary").value_or(style.background));
 
-    p.setPen(theme.Color(ColorToken::colorBorder));
+    p.setPen(Theme().Color("colorBorder").value_or(style.border));
     p.drawLine(0, 0, width(), 0);
 }
 
