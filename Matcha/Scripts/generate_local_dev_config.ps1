@@ -3,6 +3,9 @@ param(
     [string] $ConfigPath = "config/local-dev.json",
     [string] $CMakeUserPresetsPath = "CMakeUserPresets.json",
     [string] $VSCodeSettingsPath = ".vscode/settings.json",
+    [string] $VSCodeLaunchPath = ".vscode/launch.json",
+    [string] $VSCodeTasksPath = ".vscode/tasks.json",
+    [string] $VSCodeCppPropertiesPath = ".vscode/c_cpp_properties.json",
     [switch] $SkipVSCodeSettings
 )
 
@@ -17,6 +20,29 @@ function Resolve-ProjectPath {
     }
 
     return Join-Path (Get-Location).Path $Path
+}
+
+function Get-RelativePortablePath {
+    param(
+        [string] $From,
+        [string] $To
+    )
+
+    $fromFullPath = [System.IO.Path]::GetFullPath($From)
+    $toFullPath = [System.IO.Path]::GetFullPath($To)
+
+    if (-not $fromFullPath.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $fromFullPath += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    $fromUri = New-Object System.Uri($fromFullPath)
+    $toUri = New-Object System.Uri($toFullPath)
+    $relative = [System.Uri]::UnescapeDataString($fromUri.MakeRelativeUri($toUri).ToString())
+    if ($relative -eq ".") {
+        return ""
+    }
+
+    return $relative.Replace("\", "/").TrimEnd("/")
 }
 
 function Assert-FileExists {
@@ -94,6 +120,19 @@ function Write-JsonFile {
     Set-Content -Encoding UTF8 -LiteralPath $Path -Value $json
 }
 
+function Resolve-VSCodeOutputPath {
+    param(
+        [string] $Path,
+        [string] $WorkspaceRoot
+    )
+
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return $Path
+    }
+
+    return Join-Path $WorkspaceRoot $Path
+}
+
 $resolvedConfigPath = Resolve-ProjectPath $ConfigPath
 if (-not (Test-Path -LiteralPath $resolvedConfigPath -PathType Leaf)) {
     $examplePath = Resolve-ProjectPath "config/local-dev.example.json"
@@ -147,6 +186,27 @@ $configurePreset = Get-RequiredString -Object $config.presets -Name "configurePr
 $buildPreset = Get-RequiredString -Object $config.presets -Name "buildPreset"
 $inherits = Get-RequiredString -Object $config.presets -Name "inherits"
 $binaryDir = Get-RequiredString -Object $config.presets -Name "binaryDir"
+
+$projectRoot = (Get-Location).Path
+$vscodeWorkspaceRoot = $projectRoot
+if ($config.PSObject.Properties.Name -contains "vscode" -and
+    $config.vscode.PSObject.Properties.Name -contains "workspaceRoot" -and
+    -not [string]::IsNullOrWhiteSpace([string] $config.vscode.workspaceRoot)) {
+    $vscodeWorkspaceRoot = Resolve-ProjectPath ([string] $config.vscode.workspaceRoot)
+}
+
+$vscodeWorkspaceRoot = [System.IO.Path]::GetFullPath($vscodeWorkspaceRoot)
+$sourceRelativeToWorkspace = Get-RelativePortablePath -From $vscodeWorkspaceRoot -To $projectRoot
+$sourceDirForVSCode = '${workspaceFolder}'
+if (-not [string]::IsNullOrWhiteSpace($sourceRelativeToWorkspace)) {
+    $sourceDirForVSCode = '${workspaceFolder}/' + $sourceRelativeToWorkspace
+}
+
+$binaryDirForJson = $binaryDir
+if ($binaryDirForJson.StartsWith('${sourceDir}', [StringComparison]::OrdinalIgnoreCase)) {
+    $binaryDirForJson = $sourceDirForVSCode + $binaryDirForJson.Substring('${sourceDir}'.Length)
+}
+$nyanCadProgram = "$binaryDirForJson/NyanCad.exe"
 
 $environmentNames = @(
     "PATH",
@@ -232,17 +292,127 @@ if ($shouldGenerateVSCode) {
         $configureOnOpen = [bool] $config.vscode.configureOnOpen
     }
 
+    $shouldGenerateDebugConfig = $true
+    if ($config.PSObject.Properties.Name -contains "vscode" -and
+        $config.vscode.PSObject.Properties.Name -contains "generateDebugConfig") {
+        $shouldGenerateDebugConfig = [bool] $config.vscode.generateDebugConfig
+    }
+
+    $shouldGenerateCppProperties = $true
+    if ($config.PSObject.Properties.Name -contains "vscode" -and
+        $config.vscode.PSObject.Properties.Name -contains "generateCppProperties") {
+        $shouldGenerateCppProperties = [bool] $config.vscode.generateCppProperties
+    }
+
     $settings = [ordered] @{
         "cmake.useCMakePresets" = "always"
+        "cmake.sourceDirectory" = $sourceDirForVSCode
         "cmake.configurePreset" = $configurePreset
         "cmake.buildPreset" = $buildPreset
         "cmake.configureOnOpen" = $configureOnOpen
+        "cmake.debugConfig" = [ordered] @{
+            cwd = $binaryDirForJson
+        }
+        "C_Cpp.default.configurationProvider" = "ms-vscode.cmake-tools"
+        "C_Cpp.default.compileCommands" = "$binaryDirForJson/compile_commands.json"
+        "C_Cpp.default.cppStandard" = "c++23"
+        "C_Cpp.intelliSenseEngine" = "default"
     }
 
-    Write-JsonFile -Path (Resolve-ProjectPath $VSCodeSettingsPath) -Value $settings
+    Write-JsonFile -Path (Resolve-VSCodeOutputPath -Path $VSCodeSettingsPath -WorkspaceRoot $vscodeWorkspaceRoot) -Value $settings
+
+    if ($shouldGenerateDebugConfig) {
+        $tasks = [ordered] @{
+            version = "2.0.0"
+            tasks = @(
+                [ordered] @{
+                    label = "CMake: configure"
+                    type = "shell"
+                    command = "cmake"
+                    args = @("--preset", $configurePreset)
+                    options = [ordered] @{
+                        cwd = $sourceDirForVSCode
+                    }
+                    problemMatcher = @()
+                },
+                [ordered] @{
+                    label = "CMake: build NyanCad"
+                    type = "shell"
+                    command = "cmake"
+                    args = @("--build", "--preset", $buildPreset, "--target", "NyanCad")
+                    options = [ordered] @{
+                        cwd = $sourceDirForVSCode
+                    }
+                    group = [ordered] @{
+                        kind = "build"
+                        isDefault = $true
+                    }
+                    problemMatcher = '$msCompile'
+                    dependsOn = "CMake: configure"
+                }
+            )
+        }
+
+        Write-JsonFile -Path (Resolve-VSCodeOutputPath -Path $VSCodeTasksPath -WorkspaceRoot $vscodeWorkspaceRoot) -Value $tasks
+
+        $launch = [ordered] @{
+            version = "0.2.0"
+            configurations = @(
+                [ordered] @{
+                    name = "Debug NyanCad"
+                    type = "cppvsdbg"
+                    request = "launch"
+                    program = $nyanCadProgram
+                    args = @()
+                    stopAtEntry = $false
+                    cwd = $binaryDirForJson
+                    environment = @()
+                    console = "integratedTerminal"
+                    preLaunchTask = "CMake: build NyanCad"
+                }
+            )
+        }
+
+        Write-JsonFile -Path (Resolve-VSCodeOutputPath -Path $VSCodeLaunchPath -WorkspaceRoot $vscodeWorkspaceRoot) -Value $launch
+    }
+
+    if ($shouldGenerateCppProperties) {
+        $compilerPath = ""
+        $clCommand = Get-Command cl.exe -ErrorAction SilentlyContinue
+        if ($clCommand) {
+            $compilerPath = $clCommand.Source
+        }
+
+        $cppProperties = [ordered] @{
+            version = 4
+            configurations = @(
+                [ordered] @{
+                    name = "Windows MSVC"
+                    configurationProvider = "ms-vscode.cmake-tools"
+                    compileCommands = "$binaryDirForJson/compile_commands.json"
+                    compilerPath = $compilerPath
+                    cppStandard = "c++23"
+                    intelliSenseMode = "windows-msvc-x64"
+                    includePath = @(
+                        "$sourceDirForVSCode/Include",
+                        "$sourceDirForVSCode/Source"
+                    )
+                }
+            )
+        }
+
+        Write-JsonFile -Path (Resolve-VSCodeOutputPath -Path $VSCodeCppPropertiesPath -WorkspaceRoot $vscodeWorkspaceRoot) -Value $cppProperties
+    }
 }
 
 Write-Host "Generated $CMakeUserPresetsPath"
 if ($shouldGenerateVSCode) {
     Write-Host "Generated $VSCodeSettingsPath"
+    if ($shouldGenerateDebugConfig) {
+        Write-Host "Generated $VSCodeTasksPath"
+        Write-Host "Generated $VSCodeLaunchPath"
+    }
+    if ($shouldGenerateCppProperties) {
+        Write-Host "Generated $VSCodeCppPropertiesPath"
+    }
 }

@@ -111,8 +111,8 @@ public:                                                                         
     [[nodiscard]] auto ClassName() const -> std::string_view override {           \
         return s_metaClass.name;                                                 \
     }                                                                            \
-    [[nodiscard]] auto IsAKindOf(std::string_view _name) const -> bool override {\
-        return s_metaClass.IsAKindOf(_name);                                     \
+    [[nodiscard]] auto IsAKindOf(std::string_view className) const -> bool override {\
+        return s_metaClass.IsAKindOf(className);                                     \
     }                                                                            \
 private:
 

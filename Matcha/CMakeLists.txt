@@ -566,29 +566,6 @@ target_link_libraries(NyanCad
 )
 
 # --------------------------------------------------------------------------- #
-# Deploy Qt runtime DLLs next to executables (Windows only, dev convenience)
-# --------------------------------------------------------------------------- #
-if(WIN32)
-    # Copy Qt DLLs + plugins needed at runtime into the build output directory.
-    # Uses qt_generate_deploy_app_script (Qt 6.5+) for correct platform/plugin resolution.
-    qt_generate_deploy_app_script(
-        TARGET NyanCad
-        OUTPUT_SCRIPT NYANCAD_DEPLOY_SCRIPT
-        NO_UNSUPPORTED_PLATFORM_ERROR
-        NO_TRANSLATIONS
-    )
-    install(SCRIPT ${NYANCAD_DEPLOY_SCRIPT})
-
-    # For F5/debug convenience: post-build copy of essential Qt DLLs via $<TARGET_RUNTIME_DLLS>
-    add_custom_command(TARGET NyanCad POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_RUNTIME_DLLS:NyanCad> $<TARGET_FILE_DIR:NyanCad>
-        COMMAND_EXPAND_LISTS
-        COMMENT "Copying Qt runtime DLLs to build output directory..."
-    )
-endif()
-
-# --------------------------------------------------------------------------- #
 # NyanCad plugin DLLs (6 expansion plugins)
 # --------------------------------------------------------------------------- #
 function(add_nyancad_plugin TARGET_NAME PLUGIN_DIR PLUGIN_SOURCE)
@@ -862,32 +839,35 @@ set_tests_properties(MatchaIntegrationTests PROPERTIES
 endif()
 
 # --------------------------------------------------------------------------- #
-# POST_BUILD: copy Qt runtime DLLs to build output directory (Windows)
+# POST_BUILD: deploy Qt runtime dependencies next to executables (Windows)
 # --------------------------------------------------------------------------- #
 if(WIN32)
+    function(matcha_enable_qt_deploy TARGET_NAME)
+        qt_generate_deploy_app_script(
+            TARGET ${TARGET_NAME}
+            OUTPUT_SCRIPT _MATCHA_DEPLOY_SCRIPT
+            NO_UNSUPPORTED_PLATFORM_ERROR
+            NO_TRANSLATIONS
+        )
+
+        install(SCRIPT ${_MATCHA_DEPLOY_SCRIPT})
+
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND}
+                    "-DQT_DEPLOY_PREFIX=$<TARGET_FILE_DIR:${TARGET_NAME}>"
+                    "-DQT_DEPLOY_BIN_DIR=."
+                    -P "${_MATCHA_DEPLOY_SCRIPT}"
+            COMMENT "Deploying Qt runtime dependencies for ${TARGET_NAME}..."
+            VERBATIM
+        )
+    endfunction()
+
     set(_MATCHA_EXE_TARGETS NyanCad)
     if(MATCHA_BUILD_TESTS)
         list(APPEND _MATCHA_EXE_TARGETS MatchaThemeTests MatchaUnitTests MatchaWidgetTests MatchaIntegrationTests)
     endif()
 
     foreach(_target IN LISTS _MATCHA_EXE_TARGETS)
-        # Copy all runtime DLLs that CMake knows about (Qt6Core, Qt6Gui, etc.)
-        add_custom_command(TARGET ${_target} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    $<TARGET_RUNTIME_DLLS:${_target}>
-                    $<TARGET_FILE_DIR:${_target}>
-            COMMAND_EXPAND_LISTS
-            COMMENT "Copying Qt runtime DLLs for ${_target}..."
-        )
-
-        # Copy Qt platform plugin (qwindows.dll) required at runtime
-        add_custom_command(TARGET ${_target} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_FILE_DIR:${_target}>/platforms"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "$<TARGET_FILE:Qt6::QWindowsIntegrationPlugin>"
-                    "$<TARGET_FILE_DIR:${_target}>/platforms/"
-            COMMENT "Copying Qt platform plugin for ${_target}..."
-        )
+        matcha_enable_qt_deploy(${_target})
     endforeach()
 endif()

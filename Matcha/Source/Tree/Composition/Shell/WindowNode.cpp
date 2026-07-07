@@ -10,6 +10,7 @@
 #include "Matcha/Tree/Composition/Shell/TitleBarNode.h"
 #include "Matcha/Tree/UiNodeNotification.h"
 #include "Matcha/Tree/Composition/Shell/WorkspaceFrame.h"
+#include "Matcha/Theming/IThemeService.h"
 #include "Matcha/Widgets/ActionBar/ActionBarFloatingFrame.h"
 #include "Matcha/Widgets/ActionBar/NyanActionBar.h"
 #include "Matcha/Widgets/Shell/NyanDocumentToolBar.h"
@@ -857,9 +858,10 @@ void WindowNode::BuildWindow(QWidget* parent)
 
     window->installEventFilter(new WindowCloseEventFilter(*this, window));
 
-    static constexpr int kLogoColumnWidth = 64;
-    static constexpr int kTitleBarHeight  = 28;
-    static constexpr int kDocToolBarHeight = 36;
+    const auto& theme = gui::GetThemeService();
+    const int logoColumnWidth = theme.DimensionPx("spaceXXXL").value_or(64);
+    const int titleBarHeight = theme.DimensionPx("controlHeightMS").value_or(28);
+    const int docToolBarHeight = theme.DimensionPx("controlHeightLG").value_or(36);
 
     // Grid layout: Logo spans rows 0-1 col 0; TitleBar row 0 col 1;
     //              DocToolBar row 1 col 1; Central row 2 col 0-1; StatusBar row 3 col 0-1
@@ -873,7 +875,7 @@ void WindowNode::BuildWindow(QWidget* parent)
     auto logoNode = std::make_unique<LogoButtonNode>("logo-button");
     auto* logoWidget = logoNode->LogoButton();
     grid->addWidget(logoWidget, 0, 0, 2, 1);
-    grid->setColumnMinimumWidth(0, kLogoColumnWidth);
+    grid->setColumnMinimumWidth(0, logoColumnWidth);
     AddNode(std::move(logoNode));
 
 
@@ -881,7 +883,7 @@ void WindowNode::BuildWindow(QWidget* parent)
     auto titleBarNode = std::make_unique<MainTitleBarNode>("main-titlebar");
     auto* mainTitleBar = titleBarNode->MainTitleBar();
     grid->addWidget(mainTitleBar, 0, 1);
-    grid->setRowMinimumHeight(0, kTitleBarHeight);
+    grid->setRowMinimumHeight(0, titleBarHeight);
 
     // Connect TitleBar window control signals
     QObject::connect(mainTitleBar, &gui::NyanMainTitleBar::MinimizeRequested, window, [window]() {
@@ -903,24 +905,10 @@ void WindowNode::BuildWindow(QWidget* parent)
     auto docToolBarNode = std::make_unique<DocumentToolBarNode>("doc-toolbar");
     auto* docToolBarWidget = docToolBarNode->DocumentToolBar();
     grid->addWidget(docToolBarWidget, 1, 1);
-    grid->setRowMinimumHeight(1, kDocToolBarHeight);
+    grid->setRowMinimumHeight(1, docToolBarHeight);
     AddNode(std::move(docToolBarNode));
 
     grid->setRowStretch(2, 1);
-
-    _mainWindow = window;
-    return;
-
-
-    
-
-    
-
-    
-
-    
-
-    
 
     // -- Central area (row 2, col 0-1, stretch) --
     _centralArea = new QWidget(container);
@@ -964,6 +952,9 @@ void WindowNode::BuildWindow(QWidget* parent)
     auto statusBarNode = std::make_unique<StatusBarNode>();
     grid->addWidget(statusBarNode->StatusBar(), 3, 0, 1, 2);
     AddNode(std::move(statusBarNode));
+
+    _mainWindow = window;
+    return;
 }
 
 auto WindowNode::IsBuilt() const -> bool

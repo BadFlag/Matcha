@@ -2,4 +2,7 @@ build/
 CMakeUserPresets.json
 config/local-dev.json
 .vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.vscode/c_cpp_properties.json
 test_result.txt

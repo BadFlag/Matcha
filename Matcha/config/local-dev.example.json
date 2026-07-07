@@ -18,7 +18,10 @@
     "binaryDir": "${sourceDir}/build/local-windows-msvc-debug"
   },
   "vscode": {
+    "workspaceRoot": "..",
     "generateSettings": true,
-    "configureOnOpen": false
+    "configureOnOpen": false,
+    "generateDebugConfig": true,
+    "generateCppProperties": true
   }
 }
