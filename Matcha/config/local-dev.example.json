@@ -1,0 +1,24 @@
+{
+  "toolchain": {
+    "msvcInitScript": "D:/ProgramData/DevTools/toolchain/windows/msvc-init.ps1",
+    "vsInstallDir": "",
+    "arch": "x64"
+  },
+  "tools": {
+    "ninja": "D:/ProgramData/DevTools/toolchain/windows/ninja/ninja.exe"
+  },
+  "thirdParty": {
+    "qtPrefix": "D:/ProgramData/DevTools/third_party/install/qt/6.10.2/msvc-debug",
+    "extraPrefixes": []
+  },
+  "presets": {
+    "configurePreset": "local-windows-msvc-debug",
+    "buildPreset": "local-windows-msvc-debug",
+    "inherits": "windows-msvc-debug",
+    "binaryDir": "${sourceDir}/build/local-windows-msvc-debug"
+  },
+  "vscode": {
+    "generateSettings": true,
+    "configureOnOpen": false
+  }
+}

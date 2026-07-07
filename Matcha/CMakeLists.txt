@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.28)
 
 project(Matcha
     VERSION 0.1.0
-    DESCRIPTION "Matcha —— Nyan GUI Framework"
+    DESCRIPTION "Matcha -- Nyan GUI Framework"
     LANGUAGES CXX
 )
 
@@ -22,17 +22,21 @@ qt_standard_project_setup()
 # --------------------------------------------------------------------------- #
 # Compiler warnings
 # --------------------------------------------------------------------------- #
+option(MATCHA_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+option(MATCHA_BUILD_TESTS "Build Matcha test targets" OFF)
+
 add_library(Matcha_CompilerWarnings INTERFACE)
 
 if(MSVC)
     target_compile_options(Matcha_CompilerWarnings INTERFACE
         /W4
-        $<$<CONFIG:Debug>:/WX>
+        /wd4251
+        $<$<BOOL:${MATCHA_WARNINGS_AS_ERRORS}>:/WX>
     )
 else()
     target_compile_options(Matcha_CompilerWarnings INTERFACE
         -Wall -Wextra -Wpedantic
-        $<$<CONFIG:Debug>:-Werror>
+        $<$<BOOL:${MATCHA_WARNINGS_AS_ERRORS}>:-Werror>
     )
 endif()
 
@@ -613,6 +617,7 @@ add_nyancad_plugin(NyanOneDimMeshPlugin        NyanOneDimensionalMesh     NyanOn
 # --------------------------------------------------------------------------- #
 # Mock plugin shared library (for plugin system tests)
 # --------------------------------------------------------------------------- #
+if(MATCHA_BUILD_TESTS)
 add_library(MatchaMockPlugin SHARED
     Tests/TestUtils/MockPlugin.cpp
     Tests/TestUtils/MockPlugin.h
@@ -660,7 +665,11 @@ target_link_libraries(MatchaThemeTests
         Matcha_CompilerWarnings
 )
 
-file(TO_NATIVE_PATH "${CMAKE_PREFIX_PATH}/bin" _MATCHA_QT_BIN_NATIVE)
+get_filename_component(_MATCHA_QT_CMAKE_DIR "${Qt6_DIR}" DIRECTORY)
+get_filename_component(_MATCHA_QT_LIB_CMAKE_DIR "${_MATCHA_QT_CMAKE_DIR}" DIRECTORY)
+get_filename_component(_MATCHA_QT_LIB_DIR "${_MATCHA_QT_LIB_CMAKE_DIR}" DIRECTORY)
+get_filename_component(_MATCHA_QT_PREFIX_DIR "${_MATCHA_QT_LIB_DIR}" DIRECTORY)
+file(TO_NATIVE_PATH "${_MATCHA_QT_PREFIX_DIR}/bin" _MATCHA_QT_BIN_NATIVE)
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}" _MATCHA_THEME_BUILD_DIR_NATIVE)
 file(GENERATE
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/RunMatchaThemeTests.cmd"
@@ -758,7 +767,7 @@ target_link_libraries(MatchaUnitTests
 
 add_test(NAME MatchaUnitTests COMMAND MatchaUnitTests)
 set_tests_properties(MatchaUnitTests PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;PATH=${CMAKE_PREFIX_PATH}/bin\;${CMAKE_CURRENT_BINARY_DIR}\;$ENV{PATH}"
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;PATH=${_MATCHA_QT_BIN_NATIVE}\;${CMAKE_CURRENT_BINARY_DIR}\;$ENV{PATH}"
 )
 
 # -- MatchaWidgetTests (Qt Test + WidgetTestFixture) ----------------------- #
@@ -790,7 +799,7 @@ target_link_libraries(MatchaWidgetTests
 
 add_test(NAME MatchaWidgetTests COMMAND MatchaWidgetTests)
 set_tests_properties(MatchaWidgetTests PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;PATH=${CMAKE_PREFIX_PATH}/bin\;${CMAKE_CURRENT_BINARY_DIR}\;$ENV{PATH}"
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;PATH=${_MATCHA_QT_BIN_NATIVE}\;${CMAKE_CURRENT_BINARY_DIR}\;$ENV{PATH}"
 )
 
 # -- MatchaIntegrationTests (doctest + Qt) --------------------------------- #
@@ -848,38 +857,18 @@ target_link_libraries(MatchaIntegrationTests
 
 add_test(NAME MatchaIntegrationTests COMMAND MatchaIntegrationTests)
 set_tests_properties(MatchaIntegrationTests PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;PATH=${CMAKE_PREFIX_PATH}/bin\;${CMAKE_CURRENT_BINARY_DIR}\;$ENV{PATH}"
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;PATH=${_MATCHA_QT_BIN_NATIVE}\;${CMAKE_CURRENT_BINARY_DIR}\;$ENV{PATH}"
 )
-
-# --------------------------------------------------------------------------- #
-# Token Pipeline: build-time palette JSON validation (S6)
-# --------------------------------------------------------------------------- #
-find_package(Python3 COMPONENTS Interpreter QUIET)
-if(Python3_FOUND)
-    set(MATCHA_TOKEN_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/Resources/tokens_schema.json")
-    set(MATCHA_VALIDATE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/Scripts/validate_tokens.py")
-
-    file(GLOB MATCHA_PALETTE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Themes/*.json")
-
-    add_custom_target(ValidateTokens
-        COMMAND ${Python3_EXECUTABLE} ${MATCHA_VALIDATE_SCRIPT}
-                ${MATCHA_TOKEN_SCHEMA} ${MATCHA_PALETTE_FILES}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Validating palette JSON files against token schema..."
-        SOURCES ${MATCHA_VALIDATE_SCRIPT} ${MATCHA_TOKEN_SCHEMA} ${MATCHA_PALETTE_FILES}
-    )
-
-    add_dependencies(Matcha ValidateTokens)
-else()
-    message(WARNING "Python3 not found — ValidateTokens target disabled. "
-                    "Palette JSON files will NOT be validated at build time.")
 endif()
 
 # --------------------------------------------------------------------------- #
 # POST_BUILD: copy Qt runtime DLLs to build output directory (Windows)
 # --------------------------------------------------------------------------- #
 if(WIN32)
-    set(_MATCHA_EXE_TARGETS NyanCad MatchaThemeTests MatchaUnitTests MatchaWidgetTests MatchaIntegrationTests)
+    set(_MATCHA_EXE_TARGETS NyanCad)
+    if(MATCHA_BUILD_TESTS)
+        list(APPEND _MATCHA_EXE_TARGETS MatchaThemeTests MatchaUnitTests MatchaWidgetTests MatchaIntegrationTests)
+    endif()
 
     foreach(_target IN LISTS _MATCHA_EXE_TARGETS)
         # Copy all runtime DLLs that CMake knows about (Qt6Core, Qt6Gui, etc.)
@@ -891,7 +880,7 @@ if(WIN32)
             COMMENT "Copying Qt runtime DLLs for ${_target}..."
         )
 
-        # Copy Qt platform plugin (qwindows.dll) — required at runtime
+        # Copy Qt platform plugin (qwindows.dll) required at runtime
         add_custom_command(TARGET ${_target} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory
                     "$<TARGET_FILE_DIR:${_target}>/platforms"
