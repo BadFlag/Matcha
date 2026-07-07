@@ -106,10 +106,10 @@ if (-not (Test-Path -LiteralPath $resolvedConfigPath -PathType Leaf)) {
 
 $config = Get-Content -Encoding UTF8 -LiteralPath $resolvedConfigPath | ConvertFrom-Json
 
-$msvcInitScript = Get-RequiredString -Object $config.toolchain -Name "msvcInitScript"
+$msvcInitScript = Resolve-ProjectPath (Get-RequiredString -Object $config.toolchain -Name "msvcInitScript")
 $arch = Get-RequiredString -Object $config.toolchain -Name "arch"
-$ninja = Get-RequiredString -Object $config.tools -Name "ninja"
-$qtPrefix = Get-RequiredString -Object $config.thirdParty -Name "qtPrefix"
+$ninja = Resolve-ProjectPath (Get-RequiredString -Object $config.tools -Name "ninja")
+$qtPrefix = Resolve-ProjectPath (Get-RequiredString -Object $config.thirdParty -Name "qtPrefix")
 
 Assert-FileExists -Path $msvcInitScript -Name "MSVC init script"
 Assert-FileExists -Path $ninja -Name "Ninja executable"
@@ -135,8 +135,9 @@ $prefixes.Add($qtPrefix) | Out-Null
 if ($config.thirdParty.PSObject.Properties.Name -contains "extraPrefixes") {
     foreach ($prefix in $config.thirdParty.extraPrefixes) {
         if (-not [string]::IsNullOrWhiteSpace([string] $prefix)) {
-            Assert-DirectoryExists -Path ([string] $prefix) -Name "Extra CMake prefix"
-            $prefixes.Add([string] $prefix) | Out-Null
+            $resolvedPrefix = Resolve-ProjectPath ([string] $prefix)
+            Assert-DirectoryExists -Path $resolvedPrefix -Name "Extra CMake prefix"
+            $prefixes.Add($resolvedPrefix) | Out-Null
         }
     }
 }

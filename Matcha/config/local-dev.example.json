@@ -1,6 +1,6 @@
 {
   "toolchain": {
-    "msvcInitScript": "D:/ProgramData/DevTools/toolchain/windows/msvc-init.ps1",
+    "msvcInitScript": "config/toolchain/windows/msvc-init.ps1",
     "vsInstallDir": "",
     "arch": "x64"
   },
