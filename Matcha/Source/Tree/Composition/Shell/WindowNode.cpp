@@ -1,4 +1,7 @@
 #include "Matcha/Tree/Composition/Shell/WindowNode.h"
+#include "Matcha/Widgets/Shell/NyanMainTitleBar.h"
+
+
 
 #include "Matcha/Tree/Composition/ActionBar/ActionBarNode.h"
 #include "Matcha/Tree/Composition/Shell/ControlBar.h"
@@ -15,7 +18,6 @@
 #include "Matcha/Widgets/ActionBar/NyanActionBar.h"
 #include "Matcha/Widgets/Shell/NyanDocumentToolBar.h"
 #include "Matcha/Widgets/Shell/NyanLogoButton.h"
-#include "Matcha/Widgets/Shell/NyanMainTitleBar.h"
 #include "Matcha/Widgets/Shell/NyanStatusBar.h"
 #include "Matcha/Widgets/ActionBar/TrapezoidHandle.h"
 #include "Matcha/Tree/UpdateGuard.h"
@@ -34,6 +36,7 @@
 #include <QString>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <QPushButton>
 
 namespace matcha::fw {
 
@@ -846,7 +849,9 @@ void WindowNode::BuildWindow(QWidget* parent)
 
     if (_kind == WindowKind::Main) {
         window->setMinimumSize(kMinWidth, kMinHeight);
-        window->setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
+        // 控件重置阶段先恢复为普通 QMainWindow，暂时停用无边框自绘窗口。
+        // 后续如果新的标题栏控件稳定，再决定是否删除或恢复这段窗口标志设置。
+        window->setWindowFlags(window->windowFlags() | Qt::FramelessWindowHint);
     } else if (_kind == WindowKind::Floating) {
         window->setMinimumSize(800, 500);
         window->setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
@@ -858,100 +863,110 @@ void WindowNode::BuildWindow(QWidget* parent)
 
     window->installEventFilter(new WindowCloseEventFilter(*this, window));
 
-    const auto& theme = gui::GetThemeService();
-    const int logoColumnWidth = theme.DimensionPx("spaceXXXL").value_or(64);
-    const int titleBarHeight = theme.DimensionPx("controlHeightMS").value_or(28);
-    const int docToolBarHeight = theme.DimensionPx("controlHeightLG").value_or(36);
+    // 创建标题栏
+    auto* mainTitleBar = new gui::NyanMainTitleBar(window);
+    window->setMenuWidget(mainTitleBar);
 
-    // Grid layout: Logo spans rows 0-1 col 0; TitleBar row 0 col 1;
-    //              DocToolBar row 1 col 1; Central row 2 col 0-1; StatusBar row 3 col 0-1
+
+    // 控件重置阶段仅保留 QMainWindow 的空中央区域。
+    // 下方 Logo、标题栏、文档工具栏、ActionBar、DocumentArea、状态栏等 Shell 子控件
+    // 暂时不创建；后续逐个控件重建并验证后，再按需恢复对应装配代码。
+    //
+    // const auto& theme = gui::GetThemeService();
+    // const int logoColumnWidth = theme.DimensionPx("spaceXXXL").value_or(64);
+    // const int titleBarHeight = theme.DimensionPx("controlHeightMS").value_or(28);
+    // const int docToolBarHeight = theme.DimensionPx("controlHeightLG").value_or(36);
+    //
+    // 网格布局：Logo 跨第 0-1 行第 0 列；标题栏位于第 0 行第 1 列；
+    //           文档工具栏位于第 1 行第 1 列；中央区域位于第 2 行；状态栏位于第 3 行。
     auto* container = new QWidget(window);
     window->setCentralWidget(container);
     auto* grid = new QGridLayout(container);
     grid->setContentsMargins(0, 0, 0, 0);
     grid->setSpacing(0);
 
-    // -- LogoButtonNode (row 0-1, col 0) --
-    auto logoNode = std::make_unique<LogoButtonNode>("logo-button");
-    auto* logoWidget = logoNode->LogoButton();
-    grid->addWidget(logoWidget, 0, 0, 2, 1);
-    grid->setColumnMinimumWidth(0, logoColumnWidth);
-    AddNode(std::move(logoNode));
-
-
-    // -- MainTitleBarNode (row 0, col 1) --
-    auto titleBarNode = std::make_unique<MainTitleBarNode>("main-titlebar");
-    auto* mainTitleBar = titleBarNode->MainTitleBar();
-    grid->addWidget(mainTitleBar, 0, 1);
-    grid->setRowMinimumHeight(0, titleBarHeight);
-
-    // Connect TitleBar window control signals
-    QObject::connect(mainTitleBar, &gui::NyanMainTitleBar::MinimizeRequested, window, [window]() {
-        window->showMinimized();
-    });
-    QObject::connect(mainTitleBar, &gui::NyanMainTitleBar::MaximizeRequested, window, [window]() {
-        if (window->isMaximized()) {
-            window->showNormal();
-        } else {
-            window->showMaximized();
-        }
-    });
-    QObject::connect(mainTitleBar, &gui::NyanMainTitleBar::CloseRequested, window, [window]() {
-        window->close();
-    });
-    AddNode(std::move(titleBarNode));
     
-    // -- DocumentToolBarNode (row 1, col 1) --
-    auto docToolBarNode = std::make_unique<DocumentToolBarNode>("doc-toolbar");
-    auto* docToolBarWidget = docToolBarNode->DocumentToolBar();
-    grid->addWidget(docToolBarWidget, 1, 1);
-    grid->setRowMinimumHeight(1, docToolBarHeight);
-    AddNode(std::move(docToolBarNode));
+    // // -- LogoButtonNode，第 0-1 行第 0 列 --
+    // auto logoNode = std::make_unique<LogoButtonNode>("logo-button");
+    // auto* logoWidget = logoNode->LogoButton();
+    // grid->addWidget(logoWidget, 0, 0, 2, 1);
+    // grid->setColumnMinimumWidth(0, logoColumnWidth);
+    // AddNode(std::move(logoNode));
+    //
+    //
+    // // -- MainTitleBarNode，第 0 行第 1 列 --
+    // auto titleBarNode = std::make_unique<MainTitleBarNode>("main-titlebar");
+    // auto* mainTitleBar = titleBarNode->MainTitleBar();
+    // grid->addWidget(mainTitleBar, 0, 1);
+    // grid->setRowMinimumHeight(0, titleBarHeight);
+    //
+    // // 连接标题栏窗口控制信号
+    // QObject::connect(mainTitleBar, &gui::NyanMainTitleBar::MinimizeRequested, window, [window]() {
+    //     window->showMinimized();
+    // });
+    // QObject::connect(mainTitleBar, &gui::NyanMainTitleBar::MaximizeRequested, window, [window]() {
+    //     if (window->isMaximized()) {
+    //         window->showNormal();
+    //     } else {
+    //         window->showMaximized();
+    //     }
+    // });
+    // QObject::connect(mainTitleBar, &gui::NyanMainTitleBar::CloseRequested, window, [window]() {
+    //     window->close();
+    // });
+    // AddNode(std::move(titleBarNode));
+    // 
+    // // -- DocumentToolBarNode，第 1 行第 1 列 --
+    // auto docToolBarNode = std::make_unique<DocumentToolBarNode>("doc-toolbar");
+    // auto* docToolBarWidget = docToolBarNode->DocumentToolBar();
+    // grid->addWidget(docToolBarWidget, 1, 1);
+    // grid->setRowMinimumHeight(1, docToolBarHeight);
+    // AddNode(std::move(docToolBarNode));
 
     grid->setRowStretch(2, 1);
 
-    // -- Central area (row 2, col 0-1, stretch) --
+    // -- 中央空区域，第 2 行第 0-1 列，填充剩余空间 --
     _centralArea = new QWidget(container);
     _centralArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     grid->addWidget(_centralArea, 2, 0, 1, 2);
     grid->setRowStretch(2, 1);
 
-    // -- Create UiNode children that own the widgets --
-
-    // WorkspaceFrame: ActionBarNode + DocumentArea + ControlBar
-    auto wsFrame = std::make_unique<WorkspaceFrame>("main-workspace");
-    wsFrame->SetContainerWidget(_centralArea);
-
-    // ActionBar floats above central area (not in VBox layout)
-    auto actionBarNode = std::make_unique<ActionBarNode>();
-    actionBarNode->SetDocked(true);
-    auto* actionBarWidget = actionBarNode->ActionBar();
-    actionBarWidget->setParent(_centralArea);
-    actionBarWidget->raise();
-
-    // TrapezoidHandle: sibling of ActionBar on _centralArea, initially hidden
-    auto* trapezoid = new gui::TrapezoidHandle(_centralArea);
-    trapezoid->hide();
-
-    // Overlay filter manages positioning of ActionBar, TrapezoidHandle, MiniButton
-    auto* overlayFilter = new ActionBarOverlayFilter(
-        actionBarWidget, trapezoid, _centralArea);
-    _centralArea->installEventFilter(overlayFilter);
-
-    wsFrame->AddNode(std::move(actionBarNode));
-
-    auto docArea = std::make_unique<DocumentArea>("main-document-area");
-    wsFrame->AddNode(std::move(docArea));
-
-    auto controlBar = std::make_unique<ControlBar>("main-control-bar");
-    wsFrame->AddNode(std::move(controlBar));
-
-    AddNode(std::move(wsFrame));
-
-    // -- StatusBarNode (row 3, col 0-1) --
-    auto statusBarNode = std::make_unique<StatusBarNode>();
-    grid->addWidget(statusBarNode->StatusBar(), 3, 0, 1, 2);
-    AddNode(std::move(statusBarNode));
+    // // -- 创建持有控件的 UiNode 子节点 --
+    //
+    // // WorkspaceFrame：包含 ActionBarNode、DocumentArea、ControlBar
+    // auto wsFrame = std::make_unique<WorkspaceFrame>("main-workspace");
+    // wsFrame->SetContainerWidget(_centralArea);
+    //
+    // // ActionBar 浮在中央区域上方，不进入 VBox 布局
+    // auto actionBarNode = std::make_unique<ActionBarNode>();
+    // actionBarNode->SetDocked(true);
+    // auto* actionBarWidget = actionBarNode->ActionBar();
+    // actionBarWidget->setParent(_centralArea);
+    // actionBarWidget->raise();
+    //
+    // // TrapezoidHandle 是 _centralArea 上 ActionBar 的兄弟控件，初始隐藏
+    // auto* trapezoid = new gui::TrapezoidHandle(_centralArea);
+    // trapezoid->hide();
+    //
+    // // Overlay filter 负责管理 ActionBar、TrapezoidHandle、MiniButton 的定位
+    // auto* overlayFilter = new ActionBarOverlayFilter(
+    //     actionBarWidget, trapezoid, _centralArea);
+    // _centralArea->installEventFilter(overlayFilter);
+    //
+    // wsFrame->AddNode(std::move(actionBarNode));
+    //
+    // auto docArea = std::make_unique<DocumentArea>("main-document-area");
+    // wsFrame->AddNode(std::move(docArea));
+    //
+    // auto controlBar = std::make_unique<ControlBar>("main-control-bar");
+    // wsFrame->AddNode(std::move(controlBar));
+    //
+    // AddNode(std::move(wsFrame));
+    //
+    // // -- StatusBarNode，第 3 行第 0-1 列 --
+    // auto statusBarNode = std::make_unique<StatusBarNode>();
+    // grid->addWidget(statusBarNode->StatusBar(), 3, 0, 1, 2);
+    // AddNode(std::move(statusBarNode));
 
     _mainWindow = window;
     return;

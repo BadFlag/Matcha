@@ -64,6 +64,7 @@ public:
 
 private:
     gui::NyanMainTitleBar* _titleBar;
+    std::string _title;
 };
 
 } // namespace matcha::fw
