@@ -200,6 +200,8 @@ add_library(Matcha SHARED
     Include/Matcha/Widgets/Shell/NyanTabBar.h
     Source/Widgets/Shell/NyanTabItem.cpp
     Include/Matcha/Widgets/Shell/NyanTabItem.h
+    Source/Widgets/Menu/NyanMenuTypes.cpp
+    Include/Matcha/Widgets/Menu/NyanMenuTypes.h
     Source/Widgets/Menu/NyanMenuItem.cpp
     Include/Matcha/Widgets/Menu/NyanMenuItem.h
     Source/Widgets/Menu/NyanMenuSeparator.cpp

@@ -1,56 +1,28 @@
 #pragma once
 
-/**
- * @file NyanMenuBar.h
- * @brief Horizontal menu bar holding top-level menus.
- *
- * NyanMenuBar provides:
- * - Horizontal layout of menu buttons
- * - Alt-key mnemonic activation
- * - Left/Right keyboard navigation
- * - Auto-open adjacent menu on hover-while-open
- *
- * @par Visual specification (from spec3.md)
- * - Height: 24px
- * - Background: white (upper title bar)
- * - Menu item spacing: 12px
- *
- * @see NyanMenu for dropdown menus.
- * @see ThemeAware for mixin lifecycle.
- */
-
 #include <Matcha/Core/Macros.h>
 #include <Matcha/Theming/ThemeAware.h>
+#include <Matcha/Widgets/Menu/NyanMenuTypes.h>
 
 #include <QElapsedTimer>
+#include <QPointer>
 #include <QWidget>
 
 #include <cstdint>
 #include <vector>
 
-class QHBoxLayout;
+class QAction;
+class QPainter;
 
 namespace matcha::gui {
 
 class NyanMenu;
 
-/**
- * @brief Horizontal menu bar holding top-level menus.
- *
- * A11y role: MenuBar.
- */
 class MATCHA_EXPORT NyanMenuBar : public QWidget, public ThemeAware {
     Q_OBJECT
 
 public:
-    /**
-     * @brief Construct a menu bar.
-     * @param theme Theme service reference (must outlive this widget).
-     * @param parent Optional parent widget.
-     */
     explicit NyanMenuBar(QWidget* parent = nullptr);
-
-    /// @brief Destructor.
     ~NyanMenuBar() override;
 
     NyanMenuBar(const NyanMenuBar&)            = delete;
@@ -58,78 +30,76 @@ public:
     NyanMenuBar(NyanMenuBar&&)                 = delete;
     NyanMenuBar& operator=(NyanMenuBar&&)      = delete;
 
-    // -- Menu Management --
+    void SetItems(const QList<NyanMenuItemData>& items);
+    [[nodiscard]] auto Items() const -> QList<NyanMenuItemData>;
+    void AddMenu(const NyanMenuItemData& menu);
+    void AddMenu(const QString& key, const QString& text, const QList<NyanMenuItemData>& children);
+    void Clear();
 
-    /// @brief Add a menu with the given title.
-    /// @param title Menu title (use & for mnemonic, e.g., "&File").
-    /// @return Pointer to the created menu (owned by this menu bar).
+    // 兼容旧 API：返回顶层菜单对应的 NyanMenu，便于现有 MenuBarNode/MenuNode 继续填充菜单项。
     auto AddMenu(const QString& title) -> NyanMenu*;
-
-    /// @brief Remove a menu by pointer.
     void RemoveMenu(NyanMenu* menu);
-
-    /// @brief Get the menu at the given index.
     [[nodiscard]] auto MenuAt(int index) const -> NyanMenu*;
-
-    /// @brief Get the number of menus.
     [[nodiscard]] auto MenuCount() const -> int;
 
-    // -- Size hints --
-
-    /// @brief Size hint: height 24px.
     [[nodiscard]] auto sizeHint() const -> QSize override;
-
-    /// @brief Minimum size hint.
     [[nodiscard]] auto minimumSizeHint() const -> QSize override;
 
 Q_SIGNALS:
-    /// @brief Emitted when a menu is about to show.
     void MenuAboutToShow(NyanMenu* menu);
+    void ItemsChanged();
+    void ItemTriggered(const QString& key);
+    void ActionTriggered(QAction* action);
 
 protected:
-    /// @brief Custom paint for themed menu bar.
     void paintEvent(QPaintEvent* event) override;
-
-    /// @brief Handle keyboard navigation.
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void leaveEvent(QEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
-
-    /// @brief Trigger repaint on theme change.
-    void OnThemeChanged() override;
-
-    /// @brief Event filter for Alt-key activation.
     bool eventFilter(QObject* watched, QEvent* event) override;
+    void OnThemeChanged() override;
 
 private:
     struct MenuEntry {
-        QString title;
-        QString mnemonic;  ///< Single character after &
-        NyanMenu* menu = nullptr;
-        QWidget* button = nullptr;
+        NyanMenuItemData data;
+        QPointer<NyanMenu> menu;
+        QString rawTitle;
+        QString displayText;
+        QChar mnemonic;
     };
 
-    void InitLayout();
-    void CreateMenuButton(MenuEntry& entry);
-    void OnMenuButtonClicked(int index);
-    void OnMenuButtonHovered(int index);
+    [[nodiscard]] auto BarHeight() const -> int;
+    [[nodiscard]] auto IndexAt(const QPoint& pos) const -> int;
+    [[nodiscard]] auto FirstActivatableIndex() const -> int;
+    [[nodiscard]] auto NextActivatableIndex(int from, int delta) const -> int;
+    [[nodiscard]] auto IndexOfMenu(NyanMenu* menu) const -> int;
+    [[nodiscard]] auto CanActivate(const MenuEntry& entry) const -> bool;
+
+    void ParseTitle(MenuEntry& entry, const QString& title);
+    void RebuildRects();
+    void PaintEntry(QPainter& painter, int index);
     void OpenMenu(int index);
     void CloseActiveMenu();
+    void ToggleMenu(int index);
     void NavigateMenu(int delta);
     void RegisterMenuMnemonics();
     void UnregisterMenuMnemonics();
+    void SyncActionStates();
+    void HookMenuSignals(NyanMenu* menu);
 
-    static constexpr int kHeight   = 24;
-    static constexpr int kSpacing  = 12;
-    static constexpr int kPaddingH = 8;
-
-    QHBoxLayout*         _layout       = nullptr;
-    QVector<MenuEntry>   _menus;
-    int                  _activeIndex    = -1;
-    bool                 _menuOpen       = false;
+    QList<MenuEntry> _menus;
+    QList<QRect> _itemRects;
+    int _hoveredIndex = -1;
+    int _pressedIndex = -1;
+    int _activeIndex = -1;
+    bool _menuOpen = false;
+    bool _switchingMenu = false;
+    bool _altPressedAlone = false;
+    QElapsedTimer _dismissTimer;
+    int _dismissedIndex = -1;
     std::vector<uint64_t> _mnemonicIds;
-    bool                 _switchingMenu  = false;
-    bool                 _altPressedAlone = false; ///< True while Alt is held with no other key pressed.
-    QElapsedTimer        _dismissTimer;    ///< Tracks popup auto-dismiss for click-to-toggle.
-    int                  _dismissedIndex  = -1; ///< Which menu was just auto-dismissed.
 };
 
 } // namespace matcha::gui
