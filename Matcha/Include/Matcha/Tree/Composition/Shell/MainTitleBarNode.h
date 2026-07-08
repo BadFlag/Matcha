@@ -36,6 +36,7 @@ class MATCHA_EXPORT MainTitleBarNode : public TitleBarNode {
 
 public:
     MainTitleBarNode(std::string id, UiNode* parentHint = nullptr);
+    MainTitleBarNode(std::string id, gui::NyanMainTitleBar* titleBar);
     ~MainTitleBarNode() override;
 
     MainTitleBarNode(const MainTitleBarNode&)            = delete;
@@ -63,7 +64,10 @@ public:
     [[nodiscard]] auto GetQuickCommandSlot() -> observer_ptr<ContainerNode>;
 
 private:
+    void BindMenuBarChild();
+
     gui::NyanMainTitleBar* _titleBar;
+    std::string _title;
 };
 
 } // namespace matcha::fw
