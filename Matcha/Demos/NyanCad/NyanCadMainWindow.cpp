@@ -237,127 +237,6 @@ static auto BuildRightPanel() -> std::unique_ptr<matcha::fw::ContainerNode>
 // ============================================================================
 // Setup
 // ============================================================================
-
-void NyanCadMainWindow::SetupMenus(matcha::fw::Application& app)
-{
-    _app = &app;
-    auto& mainWin = app.MainWindow();
-
-    auto titleBarObs = mainWin.GetTitleBar();
-    auto* titleBarNode = dynamic_cast<matcha::fw::MainTitleBarNode*>(titleBarObs.get());
-    if (titleBarNode == nullptr) {
-        return;
-    }
-
-    titleBarNode->SetTitle("NyanCad");
-
-    auto menuBarObs = titleBarNode->GetMenuBar();
-    if (menuBarObs.get() == nullptr) {
-        return;
-    }
-
-    // -- File menu with 3-level submenu chain --
-    auto* fileMenu = menuBarObs->AddMenu("&File");
-    fileMenu->AddItem("&New");
-    fileMenu->AddItem("&Open");
-    auto* recentSub = fileMenu->AddSubmenu("Open &Recent");
-    recentSub->AddItem("Part1.stp");
-    recentSub->AddItem("Mesh1.fem");
-    recentSub->AddSeparator();
-    auto* templateSub = recentSub->AddSubmenu("From &Template");
-    templateSub->AddItem("&Blank Part");
-    templateSub->AddItem("&Sheet Metal");
-    templateSub->AddItem("&Assembly");
-    auto* importSub = fileMenu->AddSubmenu("&Import");
-    importSub->AddItem("S&TEP (.stp)");
-    importSub->AddItem("&IGES (.igs)");
-    importSub->AddItem("&STL (.stl)");
-    importSub->AddItem("&Nastran (.bdf)");
-    auto* exportSub = fileMenu->AddSubmenu("E&xport");
-    exportSub->AddItem("S&TEP (.stp)");
-    exportSub->AddItem("&IGES (.igs)");
-    exportSub->AddItem("&STL (.stl)");
-    exportSub->AddItem("&PDF Report");
-    fileMenu->AddSeparator();
-    fileMenu->AddItem("&Save");
-    fileMenu->AddItem("Save &As...");
-    fileMenu->AddItem("Save A&ll");
-    fileMenu->AddSeparator();
-    fileMenu->AddItem("&Close");
-
-    // -- Edit menu with multiple submenus for hover-switch demo --
-    auto* editMenu = menuBarObs->AddMenu("&Edit");
-    editMenu->AddItem("&Undo");
-    editMenu->AddItem("&Redo");
-    editMenu->AddSeparator();
-    editMenu->AddItem("Cu&t");
-    editMenu->AddItem("&Copy");
-    editMenu->AddItem("&Paste");
-    editMenu->AddSeparator();
-    auto* findSub = editMenu->AddSubmenu("&Find");
-    findSub->AddItem("&Find...");
-    findSub->AddItem("Find and &Replace...");
-    findSub->AddItem("Find in F&iles...");
-    findSub->AddItem("&Go to Line...");
-    auto* refactorSub = editMenu->AddSubmenu("Re&factor");
-    refactorSub->AddItem("&Rename Symbol...");
-    refactorSub->AddItem("&Extract Method...");
-    refactorSub->AddItem("&Inline Variable");
-    editMenu->AddSeparator();
-    editMenu->AddItem("Select &All");
-    editMenu->AddItem("Pre&ferences...");
-
-    // -- View menu with submenus --
-    auto* viewMenu = menuBarObs->AddMenu("&View");
-    viewMenu->AddItem("Zoom &In");
-    viewMenu->AddItem("Zoom &Out");
-    viewMenu->AddItem("&Fit All");
-    viewMenu->AddSeparator();
-    auto* panelsSub = viewMenu->AddSubmenu("&Panels");
-    panelsSub->AddCheckItem("&Properties", true);
-    panelsSub->AddCheckItem("&Inspector", true);
-    panelsSub->AddCheckItem("&Output Log", false);
-    panelsSub->AddCheckItem("&Model Tree", true);
-    auto* layoutSub = viewMenu->AddSubmenu("&Layout");
-    layoutSub->AddItem("&Single Viewport");
-    layoutSub->AddItem("2x2 &Grid");
-    layoutSub->AddItem("&Top + Bottom");
-    layoutSub->AddItem("&Left + Right");
-    layoutSub->AddItem("&Reset Layout");
-    viewMenu->AddSeparator();
-    viewMenu->AddCheckItem("Show &Grid", true);
-    viewMenu->AddCheckItem("Show &Wireframe", false);
-    viewMenu->AddCheckItem("Show &Normals", false);
-
-    // -- Mesh menu --
-    auto* meshMenu = menuBarObs->AddMenu("&Mesh");
-    meshMenu->AddItem("Generate &Surface Mesh");
-    meshMenu->AddItem("Generate &Volume Mesh");
-    meshMenu->AddSeparator();
-    auto* qualitySub = meshMenu->AddSubmenu("&Quality Check");
-    qualitySub->AddItem("&Aspect Ratio");
-    qualitySub->AddItem("&Skewness");
-    qualitySub->AddItem("&Jacobian");
-    qualitySub->AddItem("&Full Report");
-    meshMenu->AddItem("&Refine...");
-    meshMenu->AddItem("&Coarsen...");
-    meshMenu->AddSeparator();
-    meshMenu->AddItem("C&lear Mesh");
-
-    // -- Help menu --
-    auto* helpMenu = menuBarObs->AddMenu("&Help");
-    helpMenu->AddItem("&User Guide");
-    helpMenu->AddItem("&API Reference");
-    helpMenu->AddSeparator();
-    auto* layerDemoItem = helpMenu->AddItem("&Layer Demo...");
-    layerDemoItem->Subscribe(layerDemoItem, "Activated",
-        [this](matcha::EventNode&, matcha::Notification&) {
-            OnOpenLayerDemo();
-        });
-    helpMenu->AddSeparator();
-    helpMenu->AddItem("A&bout NyanCad...");
-}
-
 void NyanCadMainWindow::Setup(matcha::fw::Application& app)
 {
     _app = &app;
@@ -697,8 +576,8 @@ void NyanCadMainWindow::Setup(matcha::fw::Application& app)
         }
 
         // Wrap DocumentArea's widget as a ContainerNode child in the splitter
-        auto docViewNode = ContainerNode::Wrap("doc-view-wrap", docArea ? docArea->Widget() : nullptr);
-        splitter->AddNode(std::move(docViewNode));
+        /*auto docViewNode = ContainerNode::Wrap("doc-view-wrap", docArea ? docArea->Widget() : nullptr);
+        splitter->AddNode(std::move(docViewNode));*/
 
         // Right panel
         auto rightPanel = BuildRightPanel();

@@ -846,6 +846,7 @@ void WindowNode::BuildWindow(QWidget* parent)
     }
 
     auto* window = new QMainWindow(parent);
+    _mainWindow = window;
 
     if (_kind == WindowKind::Main) {
         window->setMinimumSize(kMinWidth, kMinHeight);
@@ -864,11 +865,16 @@ void WindowNode::BuildWindow(QWidget* parent)
     window->installEventFilter(new WindowCloseEventFilter(*this, window));
 
     // 创建标题栏
-    auto* mainTitleBar = new gui::NyanMainTitleBar(window);
+    auto titleBarNode = std::make_unique<MainTitleBarNode>("main-titlebar", this);
+    auto* mainTitleBar = titleBarNode->MainTitleBar();
     window->setMenuWidget(mainTitleBar);
-    auto titleBarNode = std::make_unique<MainTitleBarNode>("main-titlebar", mainTitleBar);
     AddNode(std::move(titleBarNode));
 
+    // 创建Doument
+    auto docToolBarNode = std::make_unique<DocumentToolBarNode>("doc-toolbar");
+    auto* docToolBarWidget = docToolBarNode->DocumentToolBar();
+    mainTitleBar->SetCustomCentral(docToolBarWidget);
+    AddNode(std::move(docToolBarNode));
 
     // 控件重置阶段仅保留 QMainWindow 的空中央区域。
     // 下方 Logo、标题栏、文档工具栏、ActionBar、DocumentArea、状态栏等 Shell 子控件
@@ -888,6 +894,15 @@ void WindowNode::BuildWindow(QWidget* parent)
     grid->setSpacing(0);
 
     
+    // 
+    // 
+    // grid->addWidget(docToolBarWidget, 1, 1);
+    // grid->setRowMinimumHeight(1, docToolBarHeight);
+    // AddNode(std::move(docToolBarNode));
+
+
+
+
     // // -- LogoButtonNode，第 0-1 行第 0 列 --
     // auto logoNode = std::make_unique<LogoButtonNode>("logo-button");
     // auto* logoWidget = logoNode->LogoButton();
@@ -919,11 +934,7 @@ void WindowNode::BuildWindow(QWidget* parent)
     // AddNode(std::move(titleBarNode));
     // 
     // // -- DocumentToolBarNode，第 1 行第 1 列 --
-    // auto docToolBarNode = std::make_unique<DocumentToolBarNode>("doc-toolbar");
-    // auto* docToolBarWidget = docToolBarNode->DocumentToolBar();
-    // grid->addWidget(docToolBarWidget, 1, 1);
-    // grid->setRowMinimumHeight(1, docToolBarHeight);
-    // AddNode(std::move(docToolBarNode));
+    
 
     grid->setRowStretch(2, 1);
 
@@ -970,7 +981,7 @@ void WindowNode::BuildWindow(QWidget* parent)
     // grid->addWidget(statusBarNode->StatusBar(), 3, 0, 1, 2);
     // AddNode(std::move(statusBarNode));
 
-    _mainWindow = window;
+    
     return;
 }
 

@@ -52,19 +52,25 @@ void NyanMenuCheckItem::DrawCheckmark(QPainter& painter, const QRect& rect) cons
     const auto& theme = Theme();
 
     // Checkmark in icon area (same position as icon)
-    constexpr int kIconSize = 16;
-    constexpr int kIconLeft = 4;
+    const int iconSize = theme.DimensionPx("iconSizeSM").value_or(16);
+    const int iconLeft = theme.DimensionPx("spaceXXS").value_or(4);
+    const int lineWidth = theme.DimensionPx("lineWidthMD").value_or(2);
 
-    QRect checkRect(rect.x() + kIconLeft, rect.center().y() - (kIconSize / 2), kIconSize, kIconSize);
+    QRect checkRect(rect.x() + iconLeft, rect.center().y() - (iconSize / 2), iconSize, iconSize);
 
     // Draw checkmark
-    painter.setPen(QPen(theme.Color(ColorToken::colorPrimary), 2));
+    painter.setPen(QPen(theme.Color(ColorToken::colorPrimary), lineWidth));
 
-    // Checkmark path: small L shape
-    int x = checkRect.center().x();
-    int y = checkRect.center().y();
-    painter.drawLine(x - 4, y, x - 1, y + 3);
-    painter.drawLine(x - 1, y + 3, x + 5, y - 4);
+    // Checkmark path: derive geometry from icon size so it scales with theme tokens.
+    const int x = checkRect.center().x();
+    const int y = checkRect.center().y();
+    const int leftOffset = iconSize / 4;
+    const int middleXOffset = lineWidth / 2;
+    const int lowerYOffset = (iconSize * 3) / 16;
+    const int rightOffset = (iconSize * 5) / 16;
+    const int upperYOffset = iconSize / 4;
+    painter.drawLine(x - leftOffset, y, x - middleXOffset, y + lowerYOffset);
+    painter.drawLine(x - middleXOffset, y + lowerYOffset, x + rightOffset, y - upperYOffset);
 }
 
 } // namespace matcha::gui

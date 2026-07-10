@@ -141,40 +141,40 @@ auto NyanCadApp::Run(int argc, char** argv) -> int
     // 后续如果空壳链路稳定且这些旧装配不再需要，可以删除下方被注释的代码。
     //
     // // 5. 将文档宿主挂入命令树，通知从文档管理器向上传播到文档宿主
-    // auto* docMgr = _impl->app->GetDocumentManagerImpl();
-    // if (docMgr) { docMgr->SetParent(&_impl->docHost); }
+    auto* docMgr = _impl->app->GetDocumentManagerImpl();
+    if (docMgr) { docMgr->SetParent(&_impl->docHost); }
     //
-    // // 6. 注册 Workshop/Workbench 描述
-    // auto* wsRegistry = _impl->app->GetWorkshopRegistry();
-    // if (wsRegistry) {
-    //     RegisterNyanCadWorkshops(*wsRegistry);
-    // }
+    // 6. 注册 Workshop/Workbench 描述
+    auto* wsRegistry = _impl->app->GetWorkshopRegistry();
+    if (wsRegistry) {
+         RegisterNyanCadWorkshops(*wsRegistry);
+     }
+    
+    // 7. 仅恢复主窗口菜单栏装配文档；Workbench、插件和调试窗口仍保持停用。
+    _impl->mainWindow.Setup(*_impl->app);
+    
+    // 8. 激活 Mesh Workshop，创建基础页签和默认 Workbench
+    auto* wbMgr = _impl->app->GetWorkbenchManager();
+    if (wbMgr) {
+         wbMgr->ActivateWorkshop(matcha::fw::WorkshopId::From("mesh"));
+    }
     //
-    // 7. 仅恢复主窗口菜单栏装配；文档、Workbench、插件和调试窗口仍保持停用。
-    _impl->mainWindow.SetupMenus(*_impl->app);
+    // 8. 从插件目录加载插件
+    auto& shell = _impl->app->GetShell();
+    auto pluginResult = _impl->pluginHost.LoadPluginsFromDirectory(
+         MATCHA_PLUGIN_DIR, shell);
+    if (pluginResult.has_value()) {
+         std::println("NyanCad: loaded {} plugins.", pluginResult.value().size());
+    }
     //
-    // // 8. 激活 Mesh Workshop，创建基础页签和默认 Workbench
-    // auto* wbMgr = _impl->app->GetWorkbenchManager();
-    // if (wbMgr) {
-    //     wbMgr->ActivateWorkshop(matcha::fw::WorkshopId::From("mesh"));
-    // }
+    // 9. 创建初始演示文档，需在 UI 绑定后执行以便页签出现
+    if (docMgr) { _impl->docHost.CreateInitialDocuments(*docMgr); }
     //
-    // // 8. 从插件目录加载插件
-    // auto& shell = _impl->app->GetShell();
-    // auto pluginResult = _impl->pluginHost.LoadPluginsFromDirectory(
-    //     MATCHA_PLUGIN_DIR, shell);
-    // if (pluginResult.has_value()) {
-    //     std::println("NyanCad: loaded {} plugins.", pluginResult.value().size());
-    // }
-    //
-    // // 9. 创建初始演示文档，需在 UI 绑定后执行以便页签出现
-    // if (docMgr) { _impl->docHost.CreateInitialDocuments(*docMgr); }
-    //
-    // // 9. 创建调试窗口，包括通知日志和 UI 检查器
-    // _impl->devTools = std::make_unique<NyanCadDevToolsWindow>();
-    // _impl->devTools->BuildWindow(_impl->app->MainWindow().Widget());
-    // _impl->devTools->Bind(*_impl->app);
-    // _impl->devTools->Show();
+    // 9. 创建调试窗口，包括通知日志和 UI 检查器
+    _impl->devTools = std::make_unique<NyanCadDevToolsWindow>();
+    _impl->devTools->BuildWindow(_impl->app->MainWindow().Widget());
+    _impl->devTools->Bind(*_impl->app);
+    _impl->devTools->Show();
 
     // 10. Show main window
     _impl->app->MainWindow().Show();
@@ -194,9 +194,9 @@ auto NyanCadApp::Run(int argc, char** argv) -> int
     //     UiNode tree and Qt widgets are STILL ALIVE.
     // 控件重置阶段未执行 NyanCadMainWindow/DevTools 装配，相关清理暂时停用。
     // 后续如果对应装配代码删除，这里也应同步删除。
-    // _impl->mainWindow.CloseFloatingWindows();
-    // _impl->mainWindow.Teardown();
-    // _impl->devTools.reset();
+    _impl->mainWindow.CloseFloatingWindows();
+    _impl->mainWindow.Teardown();
+    _impl->devTools.reset();
 
     // S2: Stop services
     //     Postcondition: no external events can arrive.
@@ -204,7 +204,7 @@ auto NyanCadApp::Run(int argc, char** argv) -> int
     _impl->app->MainWindow().Hide();
     // 控件重置阶段未加载插件，相关清理暂时停用。
     // 后续如果插件启动路径恢复，这里需要同步恢复。
-    // _impl->pluginHost.StopAll();
+    _impl->pluginHost.StopAll();
 
     // S3: Framework teardown
     //     Postcondition: UiNode tree gone, Qt widgets gone.

@@ -47,9 +47,6 @@ public:
      */
     void Setup(matcha::fw::Application& app);
 
-    /// @brief Configure only the main WindowNode menu bar.
-    void SetupMenus(matcha::fw::Application& app);
-
     /// @brief Get the main window DocumentView (valid after Setup).
     [[nodiscard]] auto GetDocumentView() -> DocumentView*;
 

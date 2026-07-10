@@ -22,13 +22,6 @@ MainTitleBarNode::MainTitleBarNode(std::string id, UiNode* parentHint)
     // NyanMainTitleBar 已移除 quick-command 子区域，后续如需恢复应通过新的自定义下层客户区接入。
 }
 
-MainTitleBarNode::MainTitleBarNode(std::string id, gui::NyanMainTitleBar* titleBar)
-    : TitleBarNode(std::move(id))
-    , _titleBar(titleBar)
-{
-    BindMenuBarChild();
-}
-
 MainTitleBarNode::~MainTitleBarNode() = default;
 
 void MainTitleBarNode::BindMenuBarChild()

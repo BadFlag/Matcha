@@ -36,7 +36,6 @@ class MATCHA_EXPORT MainTitleBarNode : public TitleBarNode {
 
 public:
     MainTitleBarNode(std::string id, UiNode* parentHint = nullptr);
-    MainTitleBarNode(std::string id, gui::NyanMainTitleBar* titleBar);
     ~MainTitleBarNode() override;
 
     MainTitleBarNode(const MainTitleBarNode&)            = delete;
