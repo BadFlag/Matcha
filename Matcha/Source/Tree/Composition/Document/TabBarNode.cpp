@@ -20,6 +20,12 @@ TabBarNode::TabBarNode(std::string id, gui::TabStyle style, QWidget* parentWidge
     : UiNode(std::move(id), NodeType::TabBar)
     , _tabBar(new gui::NyanTabBar(style, parentWidget))
 {
+    QObject::connect(_tabBar, &gui::NyanTabBar::AddTabRequested,
+        [this]() {
+            Notification::TabPageAddRequested notif;
+            SendNotification(this, notif);
+        });
+
     QObject::connect(_tabBar, &gui::NyanTabBar::TabPressed,
         [this](fw::PageId pageId) {
             Notification::TabPageSwitched notif(pageId);

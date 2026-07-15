@@ -32,13 +32,15 @@ class TabItemNode;
  * @brief Unified UiNode wrapper for NyanTabBar.
  *
  * Manages document tabs. Each tab is a TabItemNode child.
- * Fires TabPageSwitched, TabPageCloseRequested, TabPageDraggedOut.
+ * Fires TabPageAddRequested, TabPageSwitched, TabPageCloseRequested,
+ * TabPageDraggedOut, TabDroppedIn, and TabReordered.
  */
 class MATCHA_EXPORT TabBarNode : public UiNode {
     MATCHA_DECLARE_CLASS
 
 public:
     struct Notification {
+        using TabPageAddRequested = matcha::fw::TabPageAddRequested;
         using TabPageSwitched       = matcha::fw::TabPageSwitched;
         using TabPageCloseRequested = matcha::fw::TabPageCloseRequested;
         using TabPageDraggedOut     = matcha::fw::TabPageDraggedOut;
