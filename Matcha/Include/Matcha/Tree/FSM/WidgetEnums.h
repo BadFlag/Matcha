@@ -44,6 +44,9 @@ enum class ButtonVariant : uint8_t {
     Secondary,  ///< Filled neutral background
     Ghost,      ///< Outlined with border, transparent bg
     Danger,     ///< Filled error/destructive color
+    Dashed,     ///< Neutral dashed border button
+    Text,       ///< Text button with hover fill only
+    Link,       ///< Link-colored text button
 
     Count_
 };
